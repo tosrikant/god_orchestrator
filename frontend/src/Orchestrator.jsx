@@ -148,6 +148,16 @@ export default function GodModeOrchestrator() {
   const [activeAgent, setActiveAgent] = useState('Orchestrator');
   const [swarmLogs, setSwarmLogs] = useState([]);
   const [maximizedIndex, setMaximizedIndex] = useState(null); 
+  const [currentLabel, setCurrentLabel] = useState('Default');
+  const [labels, setLabels] = useState(() => {
+    try {
+      const saved = localStorage.getItem('god_mode_labels');
+      return saved ? JSON.parse(saved) : ['Default'];
+    } catch(e) { return ['Default']; }
+  });
+  const [isLabelModalOpen, setIsLabelModalOpen] = useState(false);
+  const [newLabelInput, setNewLabelInput] = useState('');
+
   // Persist label list to disk
   useEffect(() => {
     localStorage.setItem('god_mode_labels', JSON.stringify(labels));
@@ -160,11 +170,14 @@ export default function GodModeOrchestrator() {
         try {
           const res = await fetch(`/api/v1/orchestrator/history?label=${encodeURIComponent(currentLabel)}`);
           if (res.ok) {
-            const history = await res.json(); // History endpoint returns a JSON array of objects
+            const history = await res.json();
             if (history && history.length > 0) {
-              const flattened = history.flatMap(h => h.messages);
+              const flattened = history.flatMap(h => (h.messages || []).map(m => ({
+                role: m.role === 'model' ? 'ai' : m.role,
+                text: m.text,
+                agent: m.role === 'model' ? 'Orchestrator' : 'User'
+              })));
               setMessages(flattened);
-              addSystemLog(`Thread [${currentLabel}] synchronized with MongoDB.`, 'success');
             } else {
               setMessages([{ role: 'system', text: `THREAD INITIALIZED: ${currentLabel}` }]);
             }
@@ -207,35 +220,7 @@ export default function GodModeOrchestrator() {
   const sysLogsEndRef = useRef(null);
   const inputRef = useRef(null);
 
-  // --- NEW: FETCH CHAT HISTORY ON STARTUP ---
-  useEffect(() => {
-    if (isAuthenticated) {
-      console.log("Memory systems waking up... fetching history.");
-      const fetchHistory = async () => {
-        try {
-          const res = await fetch('/api/v1/orchestrator/history/default-session');
-          if (res.ok) {
-            const data = await res.json();
-            // Data is now an array of documents
-            if (Array.isArray(data)) {
-              const allMessages = data.flatMap(doc => doc.messages || []).map(m => ({
-                role: m.role,
-                text: m.text,
-                agent: m.role === 'model' ? 'Orchestrator' : 'User'
-              }));
-              if (allMessages.length > 0) {
-                setMessages(prev => [...prev, ...allMessages]);
-                setSystemLogs(prev => [...prev, { time: new Date().toISOString().split('T')[1].slice(0, 8), msg: 'Memory systems synchronized. History recovered.', type: 'success' }]);
-              }
-            }
-          }
-        } catch (err) {
-          console.error("Failed to load memory:", err);
-        }
-      };
-      fetchHistory();
-    }
-  }, [isAuthenticated]);
+  // History is now handled by the label-based useEffect above.
 
   const OUTPUT_STYLES = {
     raw: { label: 'Raw Output (Default)', prefix: '' },
