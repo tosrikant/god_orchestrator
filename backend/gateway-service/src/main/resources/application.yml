@@ -8,12 +8,6 @@ spring:
           uri: http://orchestrator-service:8081
           predicates:
             - Path=/api/v1/orchestrator/**
-      globalcors:
-        cors-configurations:
-          '[/**]':
-            allowedOrigins: "*"
-            allowedMethods: "*"
-            allowedHeaders: "*"
 
 server:
   port: 8082
