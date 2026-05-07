@@ -6,7 +6,8 @@ import {
   Image as ImageIcon, Loader2, Download, Printer, Copy, Edit2, Maximize, Minimize, Gamepad2,
   ExternalLink, Play, Paperclip, Mail, FileText, Calendar,
   Globe, GitBranch, ListTodo, MessageSquare, BookOpen, PenTool, Box,
-  Zap, Infinity, Telescope, Atom, Dna, Fingerprint, Radar, Layers, Headphones
+  Zap, Infinity, Telescope, Atom, Dna, Fingerprint, Radar, Layers, Headphones,
+  FolderSearch, PlusSquare, Hash, Trash2
 } from 'lucide-react';
 
 const SLASH_COMMANDS = [
