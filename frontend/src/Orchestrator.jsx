@@ -130,15 +130,15 @@ const MermaidBlock = ({ code }) => {
 };
 
 export default function GodModeOrchestrator() {
-  const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [isAuthenticated, setIsAuthenticated] = useState(!!localStorage.getItem('gemini_api_key'));
   const [isAuthenticating, setIsAuthenticating] = useState(false);
-  const [apiKey, setApiKey] = useState('');
+  const [apiKey, setApiKey] = useState(localStorage.getItem('gemini_api_key') || '');
   const [coreModel, setCoreModel] = useState('gemini-2.5-flash');
   const [customModel, setCustomModel] = useState('');
   
   const [chatInput, setChatInput] = useState('');
   const [messages, setMessages] = useState([
-    { role: 'system', text: 'GOD-MODE ORCHESTRATOR ONLINE. Swarm topology, MCP Registry, GameOps Engine, and Active Data pipelines initialized.' }
+    { role: 'system', text: 'GOD-MODE ORCHESTRATOR ONLINE. Persistence & Memory pipelines active.' }
   ]);
   const [isProcessing, setIsProcessing] = useState(false);
   const [activeAgent, setActiveAgent] = useState('Orchestrator');
@@ -435,6 +435,7 @@ export default function GodModeOrchestrator() {
     setTimeout(() => {
       setIsAuthenticating(false);
       setIsAuthenticated(true);
+      localStorage.setItem('gemini_api_key', apiKey);
       addLog(`Zero-Trust Gateway: API Key validated. Core set to ${coreModel}.`);
       addSystemLog(`Core Engine locked to ${coreModel}.`, 'info');
     }, 1000);
@@ -1447,6 +1448,36 @@ export default function GodModeOrchestrator() {
                         <div className="text-[10px] text-purple-400 mt-2 font-mono">{s.tools.join(', ')}</div>
                       </div>
                     ))}
+                  </div>
+                </div>
+
+                <div>
+                  <h4 className="text-xs uppercase text-slate-500 mb-3 flex items-center gap-2"><Lock className="w-4 h-4" /> Core Authentication</h4>
+                  <div className="space-y-4">
+                    <div>
+                      <label className="block text-[10px] uppercase tracking-wider text-slate-400 mb-1.5">Gemini API Key</label>
+                      <input 
+                        type="password" 
+                        value={apiKey} 
+                        onChange={(e) => {
+                          setApiKey(e.target.value);
+                          localStorage.setItem('gemini_api_key', e.target.value);
+                        }} 
+                        className="w-full bg-slate-950 border border-slate-800 rounded px-3 py-2 text-sm text-slate-300 focus:outline-none focus:border-blue-500" 
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-[10px] uppercase tracking-wider text-slate-400 mb-1.5">Engine Model</label>
+                      <select 
+                        value={coreModel} 
+                        onChange={(e) => setCoreModel(e.target.value)} 
+                        className="w-full bg-slate-950 border border-slate-800 rounded px-3 py-2 text-sm text-slate-300 focus:outline-none focus:border-blue-500 appearance-none"
+                      >
+                        <option value="gemini-2.5-flash">Gemini 2.5 Flash</option>
+                        <option value="gemini-2.5-pro">Gemini 2.5 Pro</option>
+                        <option value="gemini-2.0-flash-exp">Gemini 2.0 Flash Exp</option>
+                      </select>
+                    </div>
                   </div>
                 </div>
 
