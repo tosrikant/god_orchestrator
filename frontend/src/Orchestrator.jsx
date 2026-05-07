@@ -736,7 +736,6 @@ export default function GodModeOrchestrator() {
            throw new Error(`Gateway Execution Failed (HTTP ${execRes.status}): ${exactError}`);
         }
         
-        const part = await execRes.text(); // Declare properly
         const part = await execRes.text();
         let aiResponse = part; 
 
