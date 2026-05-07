@@ -12,6 +12,7 @@ public class ChatHistory {
     @Id
     private String id;
     private String sessionId;
+    private String label; // New field for group labeling
     private Instant timestamp;
     private List<Message> messages;
 

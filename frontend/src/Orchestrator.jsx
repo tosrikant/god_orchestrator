@@ -147,13 +147,34 @@ export default function GodModeOrchestrator() {
   const [activeAgent, setActiveAgent] = useState('Orchestrator');
   const [swarmLogs, setSwarmLogs] = useState([]);
   const [maximizedIndex, setMaximizedIndex] = useState(null); 
-  
-  // Skip login if we have a key
+  // Persist label list to disk
   useEffect(() => {
-    if (localStorage.getItem('gemini_api_key')) {
-      setIsAuthenticated(true);
+    localStorage.setItem('god_mode_labels', JSON.stringify(labels));
+  }, [labels]);
+
+  // Load history whenever the active label changes
+  useEffect(() => {
+    if (isAuthenticated) {
+      const fetchHistory = async () => {
+        try {
+          const res = await fetch(`/api/v1/orchestrator/history?label=${encodeURIComponent(currentLabel)}`);
+          if (res.ok) {
+            const history = await res.json();
+            if (history && history.length > 0) {
+              const flattened = history.flatMap(h => h.messages);
+              setMessages(flattened);
+              addSystemLog(`Thread [${currentLabel}] synchronized with MongoDB.`, 'success');
+            } else {
+              setMessages([{ role: 'system', text: `THREAD INITIALIZED: ${currentLabel}` }]);
+            }
+          }
+        } catch (err) {
+          console.error('History Sync Failed:', err);
+        }
+      };
+      fetchHistory();
     }
-  }, []);
+  }, [currentLabel, isAuthenticated]);
 
   const [isConfigOpen, setIsConfigOpen] = useState(false);
   const [connectors, setConnectors] = useState({
@@ -700,7 +721,7 @@ export default function GodModeOrchestrator() {
         // --- CALLING THE NEW JAVA BACKEND GATEWAY ---
         const GATEWAY_URL = "/api/v1/orchestrator/chat";
         
-        let execRes = await fetch(`${GATEWAY_URL}?model=${effectiveModel}`, {
+        let execRes = await fetch(`${GATEWAY_URL}?model=${effectiveModel}&label=${encodeURIComponent(currentLabel)}`, {
           method: 'POST',
           headers: { 
             'Content-Type': 'application/json',
@@ -1055,10 +1076,10 @@ export default function GodModeOrchestrator() {
     <>
       <div className="min-h-screen bg-slate-950 text-slate-300 font-mono flex flex-col overflow-hidden selection:bg-blue-900 selection:text-white print:bg-white print:text-black">
         
-        <header className="h-14 bg-slate-900 border-b border-slate-800 flex items-center justify-between px-6 shrink-0 z-10 print:hidden">
+        <header className="h-14 bg-slate-900 border-b border-slate-800 flex items-center justify-between px-6 shrink-0 z-20 print:hidden shadow-lg">
           <div className="flex items-center gap-3">
             <BrainCircuit className="w-6 h-6 text-blue-500" />
-            <span className="font-bold text-white tracking-wide">GOD-MODE</span>
+            <span className="font-bold text-white tracking-wide uppercase">God-Mode // {currentLabel || 'Main Thread'}</span>
           </div>
 
           <div className="flex items-center gap-4 bg-slate-950/50 px-4 py-1.5 rounded-full border border-slate-800 shadow-inner">
@@ -1107,42 +1128,56 @@ export default function GodModeOrchestrator() {
 
         <div className="flex-1 grid grid-cols-12 gap-0 overflow-hidden">
           
-          {/* Left Pane */}
+          {/* Left Pane: Session Vault */}
           {!isZenMode && (
             <div className="col-span-3 bg-slate-900/50 border-r border-slate-800 flex flex-col print:hidden no-pdf">
               <div className="p-4 border-b border-slate-800">
-                <h2 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-4 flex items-center gap-2"><GitMerge className="w-4 h-4" /> Topology</h2>
-                <div className="space-y-3">
-                  <div className={`p-3 rounded border transition-all ${activeAgent === 'Orchestrator' || activeAgent === 'General' ? 'bg-blue-900/20 border-blue-500/50' : 'bg-slate-950 border-slate-800'}`}>
-                    <div className="flex items-center gap-2"><BrainCircuit className="w-4 h-4 text-blue-400" /><span className="text-sm font-bold text-slate-200">Orchestrator</span></div>
-                  </div>
-                  <div className="pl-4 relative space-y-3">
-                    <div className={`p-3 rounded border transition-all ${activeAgent === 'SecOps' ? 'bg-amber-900/20 border-amber-500/50' : 'bg-slate-950 border-slate-800'}`}>
-                      <div className="flex items-center gap-2"><ShieldAlert className="w-4 h-4 text-amber-400" /><span className="text-sm font-bold text-slate-200">SecOps Node</span></div>
+                <div className="flex items-center justify-between mb-4">
+                  <h2 className="text-xs font-bold text-slate-400 uppercase tracking-wider flex items-center gap-2"><FolderSearch className="w-4 h-4" /> Chat Vault</h2>
+                  <button onClick={() => setIsLabelModalOpen(true)} className="p-1 hover:bg-slate-800 rounded text-blue-400" title="New Session Group">
+                    <PlusSquare className="w-4 h-4" />
+                  </button>
+                </div>
+                <div className="space-y-2 overflow-y-auto max-h-[40vh] custom-scrollbar">
+                  {labels.map(lbl => (
+                    <div 
+                      key={lbl} 
+                      onClick={() => {
+                        setCurrentLabel(lbl);
+                        addSystemLog(`Switching to thread: ${lbl}`, 'info');
+                      }}
+                      className={`p-2.5 rounded border flex items-center justify-between group cursor-pointer transition-all ${currentLabel === lbl ? 'bg-blue-900/20 border-blue-500/50' : 'bg-slate-950 border-slate-800 hover:border-slate-600'}`}
+                    >
+                      <div className="flex items-center gap-2 truncate">
+                        <Hash className={`w-3.5 h-3.5 ${currentLabel === lbl ? 'text-blue-400' : 'text-slate-600'}`} />
+                        <span className={`text-xs font-bold truncate ${currentLabel === lbl ? 'text-white' : 'text-slate-400'}`}>{lbl}</span>
+                      </div>
+                      {lbl !== 'Default' && (
+                        <button 
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            // Handle delete logic later
+                          }} 
+                          className="opacity-0 group-hover:opacity-100 p-1 hover:text-red-500 transition-opacity"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                      )}
                     </div>
-                    <div className={`p-3 rounded border transition-all ${activeAgent === 'DataOps' ? 'bg-emerald-900/20 border-emerald-500/50' : 'bg-slate-950 border-slate-800'}`}>
-                      <div className="flex items-center gap-2"><Database className="w-4 h-4 text-emerald-400" /><span className="text-sm font-bold text-slate-200">DataOps Node</span></div>
-                    </div>
-                    <div className={`p-3 rounded border transition-all ${activeAgent === 'DesignOps' ? 'bg-fuchsia-900/20 border-fuchsia-500/50' : 'bg-slate-950 border-slate-800'}`}>
-                      <div className="flex items-center gap-2"><ImageIcon className="w-4 h-4 text-fuchsia-400" /><span className="text-sm font-bold text-slate-200">DesignOps Node</span></div>
-                    </div>
-                    <div className={`p-3 rounded border transition-all ${activeAgent === 'GameOps' ? 'bg-orange-900/20 border-orange-500/50' : 'bg-slate-950 border-slate-800'}`}>
-                      <div className="flex items-center gap-2"><Gamepad2 className="w-4 h-4 text-orange-400" /><span className="text-sm font-bold text-slate-200">GameOps Engine</span></div>
-                    </div>
-                    <div className={`p-3 rounded border transition-all ${activeAgent === 'AudioOps' ? 'bg-indigo-900/20 border-indigo-500/50' : 'bg-slate-950 border-slate-800'}`}>
-                      <div className="flex items-center gap-2"><Headphones className="w-4 h-4 text-indigo-400" /><span className="text-sm font-bold text-slate-200">AudioOps Node</span></div>
-                    </div>
-                  </div>
+                  ))}
                 </div>
               </div>
-              <div className="flex-1 overflow-y-auto p-4 space-y-2 text-xs">
-                {swarmLogs.map((log, i) => (
-                  <div key={i} className="flex flex-col mb-2">
-                    <span className={`font-bold ${log.agent === 'SecOps' ? 'text-amber-500' : log.agent === 'DataOps' ? 'text-emerald-500' : log.agent === 'error' ? 'text-red-500' : log.agent === 'GameOps' ? 'text-orange-500' : 'text-blue-500'}`}>[{log.agent}]</span>
-                    <span className="text-slate-400 pl-2 border-l border-slate-800 ml-1">{log.msg}</span>
-                  </div>
-                ))}
-                <div ref={logsEndRef} />
+              <div className="p-4 flex-1 flex flex-col overflow-hidden">
+                <h3 className="text-[10px] font-bold text-slate-600 uppercase tracking-widest mb-3 flex items-center gap-2"><Activity className="w-3 h-3" /> System Heartbeat</h3>
+                <div className="flex-1 overflow-y-auto space-y-2 text-xs custom-scrollbar">
+                  {swarmLogs.slice(-20).map((log, i) => (
+                    <div key={i} className="flex flex-col mb-2 opacity-80">
+                      <span className={`font-bold text-[9px] ${log.agent === 'error' ? 'text-red-500' : 'text-blue-500'}`}>[{log.agent}]</span>
+                      <span className="text-slate-400 pl-2 border-l border-slate-800 ml-1 leading-tight">{log.msg}</span>
+                    </div>
+                  ))}
+                  <div ref={logsEndRef} />
+                </div>
               </div>
             </div>
           )}
@@ -1546,6 +1581,45 @@ export default function GodModeOrchestrator() {
           </div>
         )}
 
+        {isLabelModalOpen && (
+          <div className="absolute inset-0 z-[100] bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-4">
+            <div className="bg-slate-900 border border-slate-700 rounded-lg p-6 shadow-2xl w-full max-w-sm">
+              <h3 className="text-lg font-bold text-white mb-4 flex items-center gap-2"><PlusSquare className="w-5 h-5 text-blue-500" /> New Chat Group</h3>
+              <input 
+                type="text" 
+                value={newLabelInput} 
+                onChange={(e) => setNewLabelInput(e.target.value)}
+                placeholder="Enter label name (e.g., Project Alpha)"
+                className="w-full bg-slate-950 border border-slate-800 rounded px-3 py-2 text-sm text-slate-300 focus:outline-none focus:border-blue-500 mb-6"
+                autoFocus
+              />
+              <div className="flex gap-3">
+                <button 
+                  onClick={() => setIsLabelModalOpen(false)}
+                  className="flex-1 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded text-sm font-bold transition-colors"
+                >
+                  Cancel
+                </button>
+                <button 
+                  onClick={() => {
+                    if (newLabelInput.trim()) {
+                      if (!labels.includes(newLabelInput.trim())) {
+                        setLabels(prev => [...prev, newLabelInput.trim()]);
+                      }
+                      setCurrentLabel(newLabelInput.trim());
+                      setMessages([{ role: 'system', text: `THREAD INITIALIZED: ${newLabelInput.trim()}` }]);
+                      setIsLabelModalOpen(false);
+                      setNewLabelInput('');
+                    }
+                  }}
+                  className="flex-1 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded text-sm font-bold shadow-lg transition-all"
+                >
+                  Initialize
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </>
   );

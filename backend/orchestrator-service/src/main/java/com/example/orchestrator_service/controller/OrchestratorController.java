@@ -23,24 +23,25 @@ public class OrchestratorController {
     @PostMapping("/chat")
     public Mono<String> chat(
             @RequestParam String model,
+            @RequestParam(required = false, defaultValue = "Default") String label,
             @RequestHeader("X-API-KEY") String apiKey,
             @RequestBody GeminiRequest request) {
         
         return inferenceService.generateContent(model, apiKey, request)
                 .map(rawResponse -> {
-                    // Extract clean text from Gemini JSON
                     try {
                         ObjectMapper mapper = new ObjectMapper();
                         JsonNode root = mapper.readTree(rawResponse);
                         return root.path("candidates").get(0).path("content").path("parts").get(0).path("text").asText();
                     } catch (Exception e) {
-                        return rawResponse; // Fallback to raw if parsing fails
+                        return rawResponse;
                     }
                 })
                 .doOnNext(cleanText -> {
                     try {
                         com.example.orchestrator_service.model.ChatHistory history = new com.example.orchestrator_service.model.ChatHistory();
                         history.setSessionId("default-session");
+                        history.setLabel(label);
                         history.setTimestamp(java.time.Instant.now());
                         
                         com.example.orchestrator_service.model.ChatHistory.Message userMsg = new com.example.orchestrator_service.model.ChatHistory.Message();
@@ -59,9 +60,14 @@ public class OrchestratorController {
                 });
     }
 
-    @GetMapping("/history/{sessionId}")
-    public reactor.core.publisher.Flux<com.example.orchestrator_service.model.ChatHistory> getHistory(@PathVariable String sessionId) {
-        return chatHistoryRepository.findAllBySessionId(sessionId);
+    @GetMapping("/history")
+    public reactor.core.publisher.Flux<com.example.orchestrator_service.model.ChatHistory> getHistoryByLabel(@RequestParam String label) {
+        return chatHistoryRepository.findAllByLabel(label);
+    }
+
+    @DeleteMapping("/history")
+    public Mono<Void> deleteHistoryByLabel(@RequestParam String label) {
+        return chatHistoryRepository.deleteAllByLabel(label);
     }
     
     @GetMapping("/health")

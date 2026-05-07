@@ -6,4 +6,6 @@ import reactor.core.publisher.Mono;
 
 public interface ChatHistoryRepository extends ReactiveMongoRepository<ChatHistory, String> {
     reactor.core.publisher.Flux<ChatHistory> findAllBySessionId(String sessionId);
+    reactor.core.publisher.Flux<ChatHistory> findAllByLabel(String label);
+    Mono<Void> deleteAllByLabel(String label);
 }
