@@ -13,6 +13,7 @@ public class InferenceService {
     private WebClient geminiWebClient;
 
     public Mono<String> generateContent(String model, String apiKey, GeminiRequest request) {
+        
         return geminiWebClient.post()
                 .uri(uriBuilder -> uriBuilder
                         .path("/models/{model}:generateContent")

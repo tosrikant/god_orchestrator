@@ -1,0 +1,28 @@
+apiVersion: skaffold/v4beta11
+kind: Config
+metadata:
+  name: god-orchestrator
+build:
+  local:
+    push: false
+  artifacts:
+    - image: frontend
+      context: frontend
+      docker:
+        dockerfile: Dockerfile
+    - image: gateway-service
+      context: backend/gateway-service
+      docker:
+        dockerfile: Dockerfile
+    - image: orchestrator-service
+      context: backend/orchestrator-service
+      docker:
+        dockerfile: Dockerfile
+manifests:
+  rawYaml:
+    - k8s/services/frontend.yaml
+    - k8s/services/gateway.yaml
+    - k8s/services/orchestrator.yaml
+    - k8s/services/ingress.yaml
+deploy:
+  kubectl: {}
