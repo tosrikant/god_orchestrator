@@ -476,7 +476,7 @@ export default function GodModeOrchestrator() {
           generationConfig: { responseMimeType: "application/json", temperature: 0.1 }
         };
 
-        const routerRes = await fetch(`http://localhost:8082/api/v1/orchestrator/chat?model=${activeModelEndpoint}`, {
+        const routerRes = await fetch(`/api/v1/orchestrator/chat?model=${activeModelEndpoint}`, {
           method: 'POST',
           headers: { 
             'Content-Type': 'application/json',
@@ -522,7 +522,7 @@ export default function GodModeOrchestrator() {
         setLastApiPayload(imagePayload);
         setEditablePayload(JSON.stringify(imagePayload, null, 2));
 
-        const execRes = await fetch(`http://localhost:8082/api/v1/orchestrator/chat?model=imagen-4.0-generate-001`, {
+        const execRes = await fetch(`/api/v1/orchestrator/chat?model=imagen-4.0-generate-001`, {
           method: 'POST',
           headers: { 
             'Content-Type': 'application/json',
@@ -565,7 +565,7 @@ export default function GodModeOrchestrator() {
         setLastApiPayload(audioPayload);
         setEditablePayload(JSON.stringify(audioPayload, null, 2));
         
-        const execRes = await fetch(`http://localhost:8082/api/v1/orchestrator/chat?model=gemini-2.5-flash-preview-tts`, {
+        const execRes = await fetch(`/api/v1/orchestrator/chat?model=gemini-2.5-flash-preview-tts`, {
           method: 'POST',
           headers: { 
             'Content-Type': 'application/json',
@@ -657,7 +657,7 @@ export default function GodModeOrchestrator() {
         addLog(`Routing to Java Gateway (Port 8082)...`, selectedAgent);
         
         // --- CALLING THE NEW JAVA BACKEND GATEWAY ---
-        const GATEWAY_URL = "http://localhost:8082/api/v1/orchestrator/chat";
+        const GATEWAY_URL = "/api/v1/orchestrator/chat";
         
         let execRes = await fetch(`${GATEWAY_URL}?model=${effectiveModel}`, {
           method: 'POST',
@@ -708,7 +708,7 @@ export default function GodModeOrchestrator() {
           setEditablePayload(JSON.stringify(executionPayload, null, 2));
 
           addLog(`[MCP RETURN] Injecting real result back to context.`, selectedAgent);
-          execRes = await fetch(`http://localhost:8082/api/v1/orchestrator/chat?model=${activeModelEndpoint}`, {
+          execRes = await fetch(`/api/v1/orchestrator/chat?model=${activeModelEndpoint}`, {
             method: 'POST',
             headers: { 
               'Content-Type': 'application/json',
@@ -857,7 +857,7 @@ export default function GodModeOrchestrator() {
       addLog(`[Raw API Override] Intercepting payload and dispatching to network...`, 'Orchestrator');
       addSystemLog('Dispatching modified raw JSON payload...', 'info');
 
-      const execRes = await fetch(`http://localhost:8082/api/v1/orchestrator/chat?model=${activeModelEndpoint}`, {
+      const execRes = await fetch(`/api/v1/orchestrator/chat?model=${activeModelEndpoint}`, {
         method: 'POST',
         headers: { 
           'Content-Type': 'application/json',
