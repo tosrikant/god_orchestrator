@@ -25,7 +25,6 @@ public class OrchestratorController {
         
         return inferenceService.generateContent(model, apiKey, request)
                 .doOnNext(response -> {
-                    // ASYNC SAVE: Don't block the UI response
                     try {
                         com.example.orchestrator_service.model.ChatHistory history = new com.example.orchestrator_service.model.ChatHistory();
                         history.setSessionId("default-session");
@@ -37,10 +36,10 @@ public class OrchestratorController {
 
                         com.example.orchestrator_service.model.ChatHistory.Message aiMsg = new com.example.orchestrator_service.model.ChatHistory.Message();
                         aiMsg.setRole("model");
-                        aiMsg.setText("AI Response Received"); // Simplified for stability
+                        aiMsg.setText(response); // Saving the actual AI response
                         
                         history.setMessages(java.util.List.of(userMsg, aiMsg));
-                        chatHistoryRepository.save(history).subscribe(); // Fire and forget
+                        chatHistoryRepository.save(history).subscribe();
                     } catch (Exception e) {
                         System.err.println("Database Save Failed: " + e.getMessage());
                     }

@@ -16,6 +16,9 @@ spec:
       - name: orchestrator-service
         image: orchestrator-service:vFinal
         imagePullPolicy: IfNotPresent
+        env:
+        - name: SPRING_DATA_MONGODB_URI
+          value: mongodb://mongodb:27017/orchestrator
         ports:
         - containerPort: 8081
 ---
