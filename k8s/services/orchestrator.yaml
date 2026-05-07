@@ -1,7 +1,7 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: orchestrator-service
+  name: orchestrator-servic
 spec:
   replicas: 1
   selector:
