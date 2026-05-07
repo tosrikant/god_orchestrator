@@ -2,9 +2,12 @@ package com.example.orchestrator_service.controller;
 
 import com.example.orchestrator_service.model.GeminiRequest;
 import com.example.orchestrator_service.service.InferenceService;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.*;
 import reactor.core.publisher.Mono;
+import reactor.core.publisher.Flux;
 
 @RestController
 @RequestMapping("/api/v1/orchestrator")
@@ -24,7 +27,17 @@ public class OrchestratorController {
             @RequestBody GeminiRequest request) {
         
         return inferenceService.generateContent(model, apiKey, request)
-                .doOnNext(response -> {
+                .map(rawResponse -> {
+                    // Extract clean text from Gemini JSON
+                    try {
+                        ObjectMapper mapper = new ObjectMapper();
+                        JsonNode root = mapper.readTree(rawResponse);
+                        return root.path("candidates").get(0).path("content").path("parts").get(0).path("text").asText();
+                    } catch (Exception e) {
+                        return rawResponse; // Fallback to raw if parsing fails
+                    }
+                })
+                .doOnNext(cleanText -> {
                     try {
                         com.example.orchestrator_service.model.ChatHistory history = new com.example.orchestrator_service.model.ChatHistory();
                         history.setSessionId("default-session");
@@ -36,7 +49,7 @@ public class OrchestratorController {
 
                         com.example.orchestrator_service.model.ChatHistory.Message aiMsg = new com.example.orchestrator_service.model.ChatHistory.Message();
                         aiMsg.setRole("model");
-                        aiMsg.setText(response); // Saving the actual AI response
+                        aiMsg.setText(cleanText); 
                         
                         history.setMessages(java.util.List.of(userMsg, aiMsg));
                         chatHistoryRepository.save(history).subscribe();
