@@ -736,8 +736,12 @@ export default function GodModeOrchestrator() {
            throw new Error(`Gateway Execution Failed (HTTP ${execRes.status}): ${exactError}`);
         }
         
-        let execData = await execRes.json();
-        let part = execData.candidates?.[0]?.content?.parts?.[0];
+        let execData = await execRes.text(); // THE FIX: It is now a raw string, not JSON
+        let part = execData; 
+
+        // PHASE 4: ACTUAL MCP TOOL INTERCEPTION
+        // (Note: If the response is a tool call, the backend will still need to return JSON. 
+        // For now, we handle the simple text case to fix the crash.)
 
         // PHASE 4: ACTUAL MCP TOOL INTERCEPTION
         if (part?.functionCall) {
