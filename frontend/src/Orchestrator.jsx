@@ -159,7 +159,7 @@ export default function GodModeOrchestrator() {
         try {
           const res = await fetch(`/api/v1/orchestrator/history?label=${encodeURIComponent(currentLabel)}`);
           if (res.ok) {
-            const history = await res.json();
+            const history = await res.json(); // History endpoint returns a JSON array of objects
             if (history && history.length > 0) {
               const flattened = history.flatMap(h => h.messages);
               setMessages(flattened);
@@ -789,11 +789,9 @@ export default function GodModeOrchestrator() {
              throw new Error(`MCP Return Execution Failed: ${exactError}`);
           }
           
-          execData = await execRes.json();
-          part = execData.candidates?.[0]?.content?.parts?.[0];
         }
 
-        aiResponse = part?.text || "Empty response.";
+        aiResponse = part || "Empty response.";
         
         let extractedGamePayload = null;
         const htmlKeywords = ['<!DOCTYPE html>', '<html', '<head', '<body', 'import React', 'ReactDOM.render', 'ReactDOM.createRoot'];
