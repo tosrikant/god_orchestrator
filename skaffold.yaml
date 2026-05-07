@@ -24,5 +24,6 @@ manifests:
     - k8s/services/gateway.yaml
     - k8s/services/orchestrator.yaml
     - k8s/services/ingress.yaml
+    - k8s/services/mongodb.yaml
 deploy:
   kubectl: {}
