@@ -130,11 +130,14 @@ const MermaidBlock = ({ code }) => {
 };
 
 export default function GodModeOrchestrator() {
-  const [isAuthenticated, setIsAuthenticated] = useState(!!localStorage.getItem('gemini_api_key'));
+  const [isAuthenticated, setIsAuthenticated] = useState(() => {
+    return !!localStorage.getItem('gemini_api_key');
+  });
   const [isAuthenticating, setIsAuthenticating] = useState(false);
-  const [apiKey, setApiKey] = useState(localStorage.getItem('gemini_api_key') || '');
+  const [apiKey, setApiKey] = useState(() => {
+    return localStorage.getItem('gemini_api_key') || '';
+  });
   const [coreModel, setCoreModel] = useState('gemini-2.5-flash');
-  const [customModel, setCustomModel] = useState('');
   
   const [chatInput, setChatInput] = useState('');
   const [messages, setMessages] = useState([
@@ -144,6 +147,13 @@ export default function GodModeOrchestrator() {
   const [activeAgent, setActiveAgent] = useState('Orchestrator');
   const [swarmLogs, setSwarmLogs] = useState([]);
   const [maximizedIndex, setMaximizedIndex] = useState(null); 
+  
+  // Skip login if we have a key
+  useEffect(() => {
+    if (localStorage.getItem('gemini_api_key')) {
+      setIsAuthenticated(true);
+    }
+  }, []);
 
   const [isConfigOpen, setIsConfigOpen] = useState(false);
   const [connectors, setConnectors] = useState({
@@ -435,7 +445,7 @@ export default function GodModeOrchestrator() {
     setTimeout(() => {
       setIsAuthenticating(false);
       setIsAuthenticated(true);
-      localStorage.setItem('gemini_api_key', apiKey);
+      localStorage.setItem('gemini_api_key', apiKey); // SAVE TO DISK
       addLog(`Zero-Trust Gateway: API Key validated. Core set to ${coreModel}.`);
       addSystemLog(`Core Engine locked to ${coreModel}.`, 'info');
     }, 1000);
@@ -975,7 +985,13 @@ export default function GodModeOrchestrator() {
 
   if (!isAuthenticated) {
     return (
-      <div className="min-h-screen bg-slate-950 flex items-center justify-center font-mono text-slate-300">
+      <div className="min-h-screen bg-slate-950 flex items-center justify-center font-mono text-slate-300 relative">
+        <button 
+          onClick={() => setIsConfigOpen(true)} 
+          className="absolute top-6 right-6 p-2 bg-slate-900 border border-slate-800 rounded-full text-slate-500 hover:text-white transition-colors"
+        >
+          <Settings className="w-5 h-5" />
+        </button>
         <div className="bg-slate-900 p-8 rounded-lg border border-slate-700 shadow-2xl w-full max-w-md">
           <div className="flex justify-center mb-6"><ShieldCheck className="w-16 h-16 text-blue-500" /></div>
           <h1 className="text-2xl text-center text-white mb-2 font-bold tracking-tight">God-Mode Orchestrator</h1>
@@ -1042,8 +1058,37 @@ export default function GodModeOrchestrator() {
         <header className="h-14 bg-slate-900 border-b border-slate-800 flex items-center justify-between px-6 shrink-0 z-10 print:hidden">
           <div className="flex items-center gap-3">
             <BrainCircuit className="w-6 h-6 text-blue-500" />
-            <span className="font-bold text-white tracking-wide">ENTERPRISE SWARM // GOD-MODE</span>
+            <span className="font-bold text-white tracking-wide">GOD-MODE</span>
           </div>
+
+          <div className="flex items-center gap-4 bg-slate-950/50 px-4 py-1.5 rounded-full border border-slate-800 shadow-inner">
+            <div className="flex items-center gap-2 border-r border-slate-800 pr-4">
+              <Cpu className="w-3.5 h-3.5 text-blue-400" />
+              <select 
+                value={coreModel} 
+                onChange={(e) => setCoreModel(e.target.value)} 
+                className="bg-transparent text-[11px] font-bold text-slate-300 focus:outline-none cursor-pointer"
+              >
+                <option value="gemini-2.5-flash">2.5 FLASH</option>
+                <option value="gemini-2.5-pro">2.5 PRO</option>
+                <option value="gemini-2.0-flash-exp">2.0 EXP</option>
+              </select>
+            </div>
+            <div className="flex items-center gap-2">
+              <Lock className="w-3.5 h-3.5 text-amber-400" />
+              <input 
+                type="password" 
+                value={apiKey} 
+                onChange={(e) => {
+                  setApiKey(e.target.value);
+                  localStorage.setItem('gemini_api_key', e.target.value);
+                }}
+                className="bg-transparent text-[11px] text-slate-400 focus:text-white w-24 focus:outline-none transition-all"
+                placeholder="API KEY"
+              />
+            </div>
+          </div>
+
           <div className="flex items-center gap-4">
             <button onClick={handlePrint} className="flex items-center gap-2 text-xs bg-slate-800 hover:bg-slate-700 text-slate-300 px-3 py-1.5 rounded border border-slate-700 transition-colors" title="Print Native Document">
               <Printer className="w-3.5 h-3.5" /> Print
