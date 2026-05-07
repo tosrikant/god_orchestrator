@@ -736,62 +736,12 @@ export default function GodModeOrchestrator() {
            throw new Error(`Gateway Execution Failed (HTTP ${execRes.status}): ${exactError}`);
         }
         
-        let execData = await execRes.text(); // THE FIX: It is now a raw string, not JSON
-        let part = execData; 
+        const part = await execRes.text(); // Declare properly
+        const part = await execRes.text();
+        let aiResponse = part; 
 
-        // PHASE 4: ACTUAL MCP TOOL INTERCEPTION
-        // (Note: If the response is a tool call, the backend will still need to return JSON. 
-        // For now, we handle the simple text case to fix the crash.)
-
-        // PHASE 4: ACTUAL MCP TOOL INTERCEPTION
-        if (part?.functionCall) {
-          const fc = part.functionCall;
-          addLog(`[MCP TRIGGER] Agent requested tool: ${fc.name}`, selectedAgent);
-          setMessages(prev => [...prev, { role: 'system', text: `[MCP Action]: Executing ${fc.name}(${JSON.stringify(fc.args)})` }]);
-
-          let toolResult;
-          
-          if (fc.name === "search_repositories") {
-             addSystemLog(`Executing REAL HTTP fetch to api.github.com...`, 'info');
-             try {
-                const ghRes = await fetch(`https://api.github.com/search/repositories?q=${encodeURIComponent(fc.args.query)}&per_page=3`);
-                if(!ghRes.ok) throw new Error("GitHub API rate limit or error.");
-                const ghData = await ghRes.json();
-                toolResult = { repos: ghData.items?.map(i => ({ name: i.full_name, desc: i.description, stars: i.stargazers_count })) || [] };
-             } catch(e) {
-                toolResult = { error: e.message };
-             }
-          } else if (fc.name === "get_jira_ticket") {
-             toolResult = { error: "Real Jira integration failed: Atlassian API Token not configured in System Settings." };
-             addSystemLog(`Jira API call intercepted: No Auth token provided.`, 'error');
-          }
-
-          apiContents.push({ role: 'model', parts: [{ functionCall: fc }] });
-          apiContents.push({ role: 'user', parts: [{ functionResponse: { name: fc.name, response: toolResult } }] });
-          executionPayload.contents = apiContents;
-          
-          setLastApiPayload(executionPayload);
-          setEditablePayload(JSON.stringify(executionPayload, null, 2));
-
-          addLog(`[MCP RETURN] Injecting real result back to context.`, selectedAgent);
-          execRes = await fetch(`/api/v1/orchestrator/chat?model=${activeModelEndpoint}`, {
-            method: 'POST',
-            headers: { 
-              'Content-Type': 'application/json',
-              'X-API-KEY': apiKey.trim()
-            },
-            body: JSON.stringify(executionPayload)
-          });
-          
-          if (!execRes.ok) {
-             let exactError = execRes.statusText;
-             try { const errData = await execRes.json(); exactError = errData.error.message; } catch(e){}
-             throw new Error(`MCP Return Execution Failed: ${exactError}`);
-          }
-          
-        }
-
-        aiResponse = part || "Empty response.";
+        // Finalize Response
+        if (!aiResponse) aiResponse = "Empty response.";
         
         let extractedGamePayload = null;
         const htmlKeywords = ['<!DOCTYPE html>', '<html', '<head', '<body', 'import React', 'ReactDOM.render', 'ReactDOM.createRoot'];
