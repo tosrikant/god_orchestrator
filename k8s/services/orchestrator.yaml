@@ -14,7 +14,7 @@ spec:
     spec:
       containers:
       - name: orchestrator-service
-        image: orchestrator-service:latest
+        image: orchestrator-service:vFinal
         imagePullPolicy: IfNotPresent
         ports:
         - containerPort: 8080

@@ -24,19 +24,32 @@ public class OrchestratorController {
             @RequestBody GeminiRequest request) {
         
         return inferenceService.generateContent(model, apiKey, request)
-                .flatMap(response -> {
-                    // Save history logic (Session ID is simplified for now)
-                    com.example.orchestrator_service.model.ChatHistory history = new com.example.orchestrator_service.model.ChatHistory();
-                    history.setSessionId("default-session");
-                    history.setTimestamp(java.time.Instant.now());
-                    // In a real app, we'd map the request/response parts here
-                    return chatHistoryRepository.save(history).thenReturn(response);
+                .doOnNext(response -> {
+                    // ASYNC SAVE: Don't block the UI response
+                    try {
+                        com.example.orchestrator_service.model.ChatHistory history = new com.example.orchestrator_service.model.ChatHistory();
+                        history.setSessionId("default-session");
+                        history.setTimestamp(java.time.Instant.now());
+                        
+                        com.example.orchestrator_service.model.ChatHistory.Message userMsg = new com.example.orchestrator_service.model.ChatHistory.Message();
+                        userMsg.setRole("user");
+                        userMsg.setText(request.getContents().get(request.getContents().size() - 1).getParts().get(0).getText());
+
+                        com.example.orchestrator_service.model.ChatHistory.Message aiMsg = new com.example.orchestrator_service.model.ChatHistory.Message();
+                        aiMsg.setRole("model");
+                        aiMsg.setText("AI Response Received"); // Simplified for stability
+                        
+                        history.setMessages(java.util.List.of(userMsg, aiMsg));
+                        chatHistoryRepository.save(history).subscribe(); // Fire and forget
+                    } catch (Exception e) {
+                        System.err.println("Database Save Failed: " + e.getMessage());
+                    }
                 });
     }
 
     @GetMapping("/history/{sessionId}")
-    public Mono<com.example.orchestrator_service.model.ChatHistory> getHistory(@PathVariable String sessionId) {
-        return chatHistoryRepository.findBySessionId(sessionId);
+    public reactor.core.publisher.Flux<com.example.orchestrator_service.model.ChatHistory> getHistory(@PathVariable String sessionId) {
+        return chatHistoryRepository.findAllBySessionId(sessionId);
     }
     
     @GetMapping("/health")

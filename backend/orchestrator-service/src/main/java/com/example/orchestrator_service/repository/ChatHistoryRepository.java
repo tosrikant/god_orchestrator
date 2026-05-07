@@ -5,5 +5,5 @@ import org.springframework.data.mongodb.repository.ReactiveMongoRepository;
 import reactor.core.publisher.Mono;
 
 public interface ChatHistoryRepository extends ReactiveMongoRepository<ChatHistory, String> {
-    Mono<ChatHistory> findBySessionId(String sessionId);
+    reactor.core.publisher.Flux<ChatHistory> findAllBySessionId(String sessionId);
 }
