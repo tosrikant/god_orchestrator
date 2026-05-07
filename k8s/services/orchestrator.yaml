@@ -19,6 +19,10 @@ spec:
         env:
         - name: SPRING_DATA_MONGODB_URI
           value: mongodb://mongodb:27017/orchestrator
+        - name: SPRING_MONGODB_URI
+          value: mongodb://mongodb:27017/orchestrator
+        - name: MONGODB_URI
+          value: mongodb://mongodb:27017/orchestrator
         ports:
         - containerPort: 8081
 ---
