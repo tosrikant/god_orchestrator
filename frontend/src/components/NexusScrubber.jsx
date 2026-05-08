@@ -9,7 +9,7 @@ const NexusScrubber = ({
   sessions
 }) => {
   return (
-    <div className="fixed right-0 top-14 bottom-0 w-16 bg-black/40 border-l border-cyan-500/30 flex flex-col items-center py-6 gap-8 shrink-0 z-[200] backdrop-blur-xl">
+    <div className="h-full w-14 bg-black/40 border-l border-cyan-500/30 flex flex-col items-center py-6 gap-8 shrink-0 z-10 backdrop-blur-xl print:hidden">
       <div className="text-blue-500 opacity-50">
         <Layers className="w-5 h-5" />
       </div>

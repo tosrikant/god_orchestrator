@@ -237,6 +237,28 @@ export default function GodModeOrchestrator() {
   const [lastApiPayload, setLastApiPayload] = useState(null);
   const [editablePayload, setEditablePayload] = useState('{\n  // Backend Gateway Mode Active\n}');
   
+
+
+  const deleteLabel = async (lblToDelete) => {
+    if (lblToDelete === 'Default') return;
+    if (!window.confirm(`Are you sure you want to delete "${lblToDelete}" and all its history?`)) return;
+    
+    try {
+      await fetch(`/api/v1/orchestrator/history?label=${encodeURIComponent(lblToDelete)}`, { 
+        method: 'DELETE',
+        headers: { 'X-API-KEY': apiKey }
+      });
+      const newLabels = labels.filter(l => l !== lblToDelete);
+      setLabels(newLabels);
+      if (currentLabel === lblToDelete) {
+        setCurrentLabel('Default');
+      }
+      addSystemLog(`Thread "${lblToDelete}" purged successfully from cluster.`, 'success');
+    } catch (err) {
+      addSystemLog(`Failed to delete thread: ${err.message}`, 'error');
+    }
+  };
+
   const [chatAttachments, setChatAttachments] = useState([]);
   const [showSlashMenu, setShowSlashMenu] = useState(false);
   const [slashFilter, setSlashFilter] = useState('');
@@ -245,6 +267,68 @@ export default function GodModeOrchestrator() {
   const [outputStyle, setOutputStyle] = useState('raw');
   const [systemLogs, setSystemLogs] = useState([{ time: new Date().toISOString().split('T')[1].slice(0, 8), msg: 'SYSTEM BOOT: Watchdog active.', type: 'info' }]);
   const [isZenMode, setIsZenMode] = useState(false);
+  const [leftWidth, setLeftWidth] = useState(320);
+  const [rightWidth, setRightWidth] = useState(320);
+  const [telemetryHeight, setTelemetryHeight] = useState(400); // Height of the top telemetry part
+  const [payloadHeight, setPayloadHeight] = useState(300); // Height of the payload part
+  
+  const isResizingLeft = useRef(false);
+  const isResizingRight = useRef(false);
+  const isResizingTeleV = useRef(false);
+  const isResizingPayloadV = useRef(false);
+
+  const handleMouseMove = (e) => {
+    if (isResizingLeft.current) {
+      setLeftWidth(Math.max(200, Math.min(600, e.clientX)));
+    }
+    if (isResizingRight.current) {
+      setRightWidth(Math.max(200, Math.min(800, window.innerWidth - e.clientX)));
+    }
+    if (isResizingTeleV.current) {
+      setTelemetryHeight(Math.max(100, Math.min(800, e.clientY - 60))); // Adj for header
+    }
+    if (isResizingPayloadV.current) {
+      setPayloadHeight(Math.max(100, Math.min(800, e.clientY - 400))); 
+    }
+  };
+
+  const stopResizing = () => {
+    isResizingLeft.current = false;
+    isResizingRight.current = false;
+    isResizingTeleV.current = false;
+    isResizingPayloadV.current = false;
+    document.removeEventListener('mousemove', handleMouseMove);
+    document.removeEventListener('mouseup', stopResizing);
+    document.body.style.cursor = 'default';
+  };
+
+  const startResizingLeft = () => {
+    isResizingLeft.current = true;
+    document.addEventListener('mousemove', handleMouseMove);
+    document.addEventListener('mouseup', stopResizing);
+    document.body.style.cursor = 'col-resize';
+  };
+
+  const startResizingRight = () => {
+    isResizingRight.current = true;
+    document.addEventListener('mousemove', handleMouseMove);
+    document.addEventListener('mouseup', stopResizing);
+    document.body.style.cursor = 'col-resize';
+  };
+
+  const startResizingTeleV = () => {
+    isResizingTeleV.current = true;
+    document.addEventListener('mousemove', handleMouseMove);
+    document.addEventListener('mouseup', stopResizing);
+    document.body.style.cursor = 'row-resize';
+  };
+
+  const startResizingPayloadV = () => {
+    isResizingPayloadV.current = true;
+    document.addEventListener('mousemove', handleMouseMove);
+    document.addEventListener('mouseup', stopResizing);
+    document.body.style.cursor = 'row-resize';
+  };
 
   const chatContainerRef = useRef(null);
   const chatEndRef = useRef(null);
@@ -1267,11 +1351,18 @@ export default function GodModeOrchestrator() {
           </div>
         </header>
 
-        <div className={`flex-1 flex overflow-hidden ${theme === 'retro' ? 'flex-row-reverse' : 'flex-row'}`}>
+        <div className={`flex-1 flex overflow-hidden flex-row`}>
           
           {/* Left Pane: Session Vault */}
           {!isZenMode && (
-            <div className="w-72 bg-black/90 border-r border-cyan-900/50 flex flex-col print:hidden no-pdf shrink-0 relative z-20 shadow-[0_0_20px_rgba(0,255,255,0.1)]">
+            <div 
+              className={`bg-black/90 border-r border-cyan-900/50 flex flex-col print:hidden no-pdf shrink-0 relative z-20 shadow-[0_0_20px_rgba(0,255,255,0.1)]`}
+              style={{ width: `${leftWidth}px` }}
+            >
+              <div 
+                onMouseDown={startResizingLeft} 
+                className="absolute right-[-3px] top-0 bottom-0 w-1.5 cursor-col-resize hover:bg-blue-500/30 transition-colors z-50" 
+              />
               <div className="p-4 border-b border-slate-800 shrink-0">
                 <div className="flex items-center justify-between mb-4">
                   <h2 className="text-xs font-bold text-slate-400 uppercase tracking-wider flex items-center gap-2"><FolderSearch className="w-4 h-4" /> Chat Vault</h2>
@@ -1288,10 +1379,22 @@ export default function GodModeOrchestrator() {
                       }}
                       className={`p-2.5 rounded border flex items-center justify-between group cursor-pointer transition-all ${currentLabel === lbl ? 'bg-blue-900/20 border-blue-500/50' : 'bg-slate-950 border-slate-800 hover:border-slate-600'}`}
                     >
-                      <div className="flex items-center gap-2 truncate">
+                      <div className="flex items-center gap-2 truncate" onClick={() => setCurrentLabel(lbl)}>
                         <Hash className={`w-3.5 h-3.5 ${currentLabel === lbl ? 'text-blue-400' : 'text-slate-600'}`} />
                         <span className={`text-xs font-bold truncate ${currentLabel === lbl ? 'text-white' : 'text-slate-400'}`}>{lbl}</span>
                       </div>
+                      
+                      {lbl !== 'Default' && (
+                        <button 
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            deleteLabel(lbl);
+                          }}
+                          className="opacity-0 group-hover:opacity-100 p-1 hover:bg-red-500/20 rounded text-slate-500 hover:text-red-400 transition-all"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                      )}
                     </div>
                   ))}
                 </div>
@@ -1301,8 +1404,7 @@ export default function GodModeOrchestrator() {
                 <div className="grid grid-cols-3 gap-1.5">
                   {[
                     { id: 'cyber', label: 'CYBER', icon: <Zap className="w-3 h-3" /> },
-                    { id: 'minimal', label: 'MINI', icon: <Square className="w-3 h-3" /> },
-                    { id: 'retro', label: 'RETRO', icon: <Radio className="w-3 h-3" /> }
+                    { id: 'minimal', label: 'MINI', icon: <Square className="w-3 h-3" /> }
                   ].map(v => (
                     <button
                       key={v.id}
@@ -1601,8 +1703,15 @@ export default function GodModeOrchestrator() {
 
           {/* Right Pane: Telemetry Hub */}
           {!isZenMode && (
-            <div className="w-80 bg-black/60 border-l border-cyan-900/50 flex flex-col print:hidden no-pdf shrink-0 overflow-hidden backdrop-blur-xl relative z-20">
-              <div className="p-4 border-b border-slate-800 shrink-0">
+            <div 
+              className="bg-black/60 border-l border-cyan-900/50 flex flex-col print:hidden no-pdf shrink-0 overflow-hidden backdrop-blur-xl relative z-20"
+              style={{ width: `${rightWidth}px` }}
+            >
+              <div 
+                onMouseDown={startResizingRight} 
+                className="absolute left-[-3px] top-0 bottom-0 w-1.5 cursor-col-resize hover:bg-blue-500/30 transition-colors z-50" 
+              />
+              <div className="p-4 border-b border-slate-800 shrink-0 overflow-y-auto custom-scrollbar" style={{ height: `${telemetryHeight}px` }}>
                 <h2 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-4 flex items-center gap-2"><Activity className="w-4 h-4 text-blue-500" /> Live Telemetry</h2>
                 
                 <div className="space-y-4">
@@ -1625,33 +1734,35 @@ export default function GodModeOrchestrator() {
                     </div>
                   </div>
 
-                  <div className="bg-slate-950/50 border border-emerald-900/30 rounded-lg p-3">
-                    <span className="text-[10px] font-bold text-slate-600 uppercase block mb-2">Lifetime Financials</span>
-                    <div className="flex items-center justify-between mb-3 border-b border-slate-800 pb-2">
-                      <div className="flex flex-col">
-                        <span className="text-xl font-bold text-emerald-400 leading-none">${billingStats.totalCost.toFixed(4)}</span>
-                        <span className="text-[8px] font-bold text-slate-500 uppercase mt-1">Accrued Cost (USD)</span>
-                      </div>
-                      <div className="text-right">
-                        <span className="text-sm font-bold text-slate-300 leading-none">{billingStats.requestCount}</span>
-                        <span className="text-[8px] font-bold text-slate-500 uppercase block">Requests</span>
+                   <div className="bg-slate-950/50 border border-emerald-900/30 rounded-lg p-3">
+                    <div className="flex justify-between items-center mb-3">
+                      <span className="text-[10px] font-bold text-slate-500 uppercase">Financials</span>
+                      <div className="flex items-center gap-1.5 bg-slate-900 px-2 py-0.5 rounded border border-slate-800">
+                        <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                        <span className="text-[9px] font-mono text-slate-400">{billingStats.requestCount} REQ</span>
                       </div>
                     </div>
-                    <div className="grid grid-cols-2 gap-4 text-[10px]">
-                      <div className="flex flex-col">
-                        <span className="text-slate-400 font-bold">{(billingStats.totalInputTokens / 1000).toFixed(1)}k</span>
-                        <span className="text-[8px] text-slate-600 uppercase">Input Tokens</span>
+                    <div className="flex items-baseline gap-2 mb-4">
+                      <span className="text-2xl font-bold text-emerald-400 tracking-tighter">${billingStats.totalCost.toFixed(5)}</span>
+                      <span className="text-[8px] text-slate-600 uppercase font-bold">USD</span>
+                    </div>
+                    <div className="space-y-2 border-t border-slate-800/50 pt-3">
+                      <div className="flex justify-between items-center">
+                        <span className="text-[9px] text-slate-500 font-bold uppercase tracking-widest">Input context</span>
+                        <span className="text-[10px] text-slate-300 font-mono">{(billingStats.totalInputTokens / 1000).toFixed(1)}k</span>
                       </div>
-                      <div className="flex flex-col text-right">
-                        <span className="text-slate-400 font-bold">{(billingStats.totalOutputTokens / 1000).toFixed(1)}k</span>
-                        <span className="text-[8px] text-slate-600 uppercase">Output Tokens</span>
+                      <div className="flex justify-between items-center">
+                        <span className="text-[9px] text-slate-500 font-bold uppercase tracking-widest">Output context</span>
+                        <span className="text-[10px] text-slate-300 font-mono">{(billingStats.totalOutputTokens / 1000).toFixed(1)}k</span>
                       </div>
                     </div>
                   </div>
                 </div>
               </div>
 
-              <div className="flex-1 flex flex-col overflow-hidden">
+              <div onMouseDown={startResizingTeleV} className="h-1 w-full cursor-row-resize hover:bg-blue-500/40 transition-colors z-30 shrink-0 border-b border-slate-800" />
+
+              <div className="flex flex-col overflow-hidden shrink-0" style={{ height: `${payloadHeight}px` }}>
                 <div className="h-10 bg-slate-900 border-b border-slate-800 flex items-center justify-between px-4 shrink-0">
                   <div className="flex items-center">
                     <FileJson className="w-3.5 h-3.5 text-slate-400 mr-2" />
@@ -1672,8 +1783,12 @@ export default function GodModeOrchestrator() {
                     className="flex-1 w-full bg-transparent text-[10px] text-slate-500 font-mono resize-none focus:outline-none custom-scrollbar"
                   />
                 </div>
+              </div>
 
-                <div className="h-10 bg-slate-900 border-y border-slate-800 flex items-center px-4 shrink-0">
+              <div onMouseDown={startResizingPayloadV} className="h-1 w-full cursor-row-resize hover:bg-blue-500/40 transition-colors z-30 shrink-0 border-b border-slate-800" />
+
+              <div className="flex-1 flex flex-col min-h-0 overflow-hidden">
+                <div className="h-10 bg-slate-900 border-b border-slate-800 flex items-center px-4 shrink-0">
                   <Terminal className="w-3.5 h-3.5 text-slate-400 mr-2" />
                   <span className="text-[10px] font-bold text-slate-400 uppercase tracking-tighter">System Event Log</span>
                 </div>
