@@ -347,6 +347,8 @@ export default function GodModeOrchestrator() {
   }, [currentLabel, isAuthenticated]);
 
   const [isConfigOpen, setIsConfigOpen] = useState(false);
+  const [gcpProjectId, setGcpProjectId] = useState(() => localStorage.getItem('gcp_project_id') || '');
+  const [gcsBucket, setGcsBucket] = useState(() => localStorage.getItem('gcs_bucket') || '');
   const [connectors, setConnectors] = useState({
     oneLake: { id: 'oneLake', name: 'MS Fabric OneLake', active: true, type: 'Data Lake' },
     bigQuery: { id: 'bigQuery', name: 'GCP BigQuery', active: false, type: 'Data Warehouse' }
@@ -1197,12 +1199,26 @@ export default function GodModeOrchestrator() {
         // --- VIDEO JOB DETECTION ---
         if (aiResponse.includes('INITIATE_VIDEO_JOB:') || selectedAgent === 'VideoOps') {
            const videoPrompt = aiResponse.replace('INITIATE_VIDEO_JOB:', '').trim() || "Generating Cinematic Sequence...";
-           addLog(`Initiating Cinematic Synthesis: "${videoPrompt}"`, 'VideoOps');
+           
+           // PROACTIVE CONFIG GUARD: Check for GCP metadata
+           if (!gcpProjectId || !gcsBucket) {
+              addLog(`CRITICAL: Production metadata missing. Provisioning configuration portal...`, 'VideoOps');
+              addSystemLog(`VIDEO_OPS_FAULT: Missing GCP Project ID or GCS Bucket.`, 'error');
+              setIsConfigOpen(true); // Open settings automatically
+              setIsProcessing(false);
+              return;
+           }
+
+           addLog(`Initiating Production Cinematic Synthesis: "${videoPrompt}"`, 'VideoOps');
            
            try {
              const vidRes = await fetch(`/api/v1/orchestrator/video/generate?label=${encodeURIComponent(currentLabel)}`, {
                method: 'POST',
-               headers: { 'Content-Type': 'application/json' },
+               headers: { 
+                 'Content-Type': 'application/json',
+                 'X-GCP-PROJECT': gcpProjectId,
+                 'X-GCS-BUCKET': gcsBucket
+               },
                body: JSON.stringify({ prompt: videoPrompt })
              });
              
@@ -2157,6 +2173,42 @@ export default function GodModeOrchestrator() {
                         <option value="gemini-2.5-pro">Gemini 2.5 Pro</option>
                         <option value="gemini-2.0-flash-exp">Gemini 2.0 Flash Exp</option>
                       </select>
+                    </div>
+
+                    <div className="pt-4 space-y-4 border-t border-slate-800">
+                      <h4 className="text-[10px] font-black uppercase text-cyan-500 tracking-widest flex items-center gap-2">
+                        <Film className="w-3 h-3" /> Production VideoOps Configuration
+                      </h4>
+                      
+                      <div className="grid grid-cols-2 gap-4">
+                        <div>
+                          <label className="block text-[10px] uppercase tracking-wider text-slate-400 mb-1.5 font-bold">GCP Project ID</label>
+                          <input 
+                            type="text" 
+                            value={gcpProjectId} 
+                            onChange={(e) => {
+                              setGcpProjectId(e.target.value);
+                              localStorage.setItem('gcp_project_id', e.target.value);
+                            }} 
+                            className="w-full bg-slate-950 border border-slate-800 rounded px-3 py-2 text-xs text-cyan-400 focus:outline-none focus:border-cyan-500" 
+                            placeholder="project-id-123"
+                          />
+                        </div>
+
+                        <div>
+                          <label className="block text-[10px] uppercase tracking-wider text-slate-400 mb-1.5 font-bold">GCS Bucket</label>
+                          <input 
+                            type="text" 
+                            value={gcsBucket} 
+                            onChange={(e) => {
+                              setGcsBucket(e.target.value);
+                              localStorage.setItem('gcs_bucket', e.target.value);
+                            }} 
+                            className="w-full bg-slate-950 border border-slate-800 rounded px-3 py-2 text-xs text-emerald-400 focus:outline-none focus:border-emerald-500" 
+                            placeholder="my-artifacts-bucket"
+                          />
+                        </div>
+                      </div>
                     </div>
                   </div>
                 </div>

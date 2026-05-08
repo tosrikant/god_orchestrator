@@ -8,6 +8,11 @@ import org.springframework.web.reactive.function.client.WebClient;
 public class GeminiConfig {
 
     @Bean
+    public WebClient.Builder webClientBuilder() {
+        return WebClient.builder();
+    }
+
+    @Bean
     public WebClient geminiWebClient() {
         return WebClient.builder()
                 .baseUrl("https://generativelanguage.googleapis.com/v1beta")
