@@ -1533,34 +1533,102 @@ export default function GodModeOrchestrator() {
                   const persona = AGENT_PERSONAS[msg.agent] || AGENT_PERSONAS['General'];
                   const isMaximized = maximizedIndex === i;
                   
-                  let containerClasses = `ai-response max-w-[90%] w-full rounded-lg p-4 print:max-w-full print:border-none print:shadow-none print:bg-transparent ${msg.role === 'user' ? 'bg-slate-800 border border-slate-700 print:text-black w-auto' : msg.role === 'system' ? 'bg-slate-900 border border-slate-700 text-xs text-center w-full print:hidden' : `${persona.bgColor} border ${persona.borderColor} print:text-black`}`;
-                  
+                  // REDESIGNED IMMERSIVE FOCUS STUDIO
                   if (isMaximized) {
-                    containerClasses = `!fixed !top-0 !left-0 !w-screen !h-screen !max-w-none !m-0 !rounded-none !bg-slate-950 !overflow-y-auto p-6 sm:p-12 flex flex-col print:hidden !z-[999999]`;
+                    return (
+                      <div key={msg.id || i} className="fixed inset-0 z-[999999] bg-slate-950 flex flex-col sm:flex-row overflow-hidden animate-in fade-in zoom-in duration-300">
+                        {/* LEFT: ARTIFACT CANVAS (Primary Focus) */}
+                        <div className="flex-1 relative bg-black flex items-center justify-center overflow-hidden border-r border-slate-800">
+                          {msg.gamePayload && (
+                            <iframe 
+                              srcDoc={msg.gamePayload} 
+                              className="w-full h-full border-none bg-white shadow-2xl" 
+                              title="Artifact Runtime" 
+                            />
+                          )}
+                          {msg.imageUrl && !msg.gamePayload && (
+                            <img src={msg.imageUrl} alt="Artifact" className="max-w-full max-h-full object-contain shadow-2xl" />
+                          )}
+                          {!msg.gamePayload && !msg.imageUrl && (
+                            <div className="p-12 max-w-3xl w-full">
+                               <div className="text-[10px] font-bold text-blue-500 uppercase tracking-[0.3em] mb-4 flex items-center gap-2">
+                                 <BrainCircuit className="w-4 h-4" /> Intelligence Stream // Reader Mode
+                               </div>
+                               <div className="text-xl leading-relaxed text-slate-200 font-serif italic border-l-2 border-blue-600 pl-8">
+                                 {renderMessageContent(msg.text)}
+                               </div>
+                            </div>
+                          )}
+                          
+                          {/* FLOATING ACTION OVERLAY */}
+                          <div className="absolute top-6 left-6 flex gap-3">
+                             <div className="bg-blue-600/90 backdrop-blur px-3 py-1.5 rounded text-[10px] font-black text-white uppercase tracking-widest shadow-lg flex items-center gap-2">
+                               <Zap className="w-3 h-3" /> Artifact Live
+                             </div>
+                          </div>
+                        </div>
+
+                        {/* RIGHT: TACTICAL CONTEXT (Glassmorphism Sidepanel) */}
+                        <div className="w-full sm:w-80 lg:w-96 bg-slate-900/50 backdrop-blur-xl flex flex-col border-l border-slate-800 shadow-2xl">
+                          <div className="p-6 border-b border-slate-800/50 flex items-center justify-between bg-slate-950/50">
+                            <div className="flex items-center gap-3">
+                              <div className={`w-8 h-8 rounded-full flex items-center justify-center bg-slate-800 ${persona.color}`}>
+                                {persona.icon}
+                              </div>
+                              <div>
+                                <div className={`text-[10px] font-black uppercase tracking-widest ${persona.color}`}>{persona.name}</div>
+                                <div className="text-[9px] text-slate-500 font-mono">NODE_ID: {Math.random().toString(36).substring(7).toUpperCase()}</div>
+                              </div>
+                            </div>
+                            <button 
+                              onClick={() => setMaximizedIndex(null)}
+                              className="p-2 hover:bg-red-500/20 hover:text-red-400 text-slate-500 rounded-full transition-all"
+                            >
+                              <X className="w-5 h-5" />
+                            </button>
+                          </div>
+
+                          <div className="flex-1 overflow-y-auto p-6 custom-scrollbar space-y-6">
+                            <div>
+                               <h4 className="text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-3">Orchestration Logic</h4>
+                               <div className="text-xs leading-relaxed text-slate-400 space-y-4">
+                                 {renderMessageContent(msg.text)}
+                               </div>
+                            </div>
+                            
+                            {msg.audioUrl && (
+                              <div className="bg-slate-950/50 border border-slate-800 rounded-lg p-4">
+                                <div className="text-[10px] font-bold text-slate-500 uppercase mb-3 flex items-center gap-2"><Headphones className="w-3 h-3"/> Audio Output</div>
+                                <audio controls className="w-full h-8" src={msg.audioUrl} />
+                              </div>
+                            )}
+
+                            <div className="pt-6 border-t border-slate-800/50">
+                              <h4 className="text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-3">System Actions</h4>
+                              <div className="grid grid-cols-2 gap-2">
+                                <button onClick={() => handlePopOut(msg)} className="flex items-center justify-center gap-2 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 text-[10px] font-bold rounded border border-slate-700 transition-all">
+                                  <ExternalLink className="w-3.5 h-3.5"/> POP-OUT
+                                </button>
+                                <button onClick={() => handleCopyMessage(msg.text)} className="flex items-center justify-center gap-2 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 text-[10px] font-bold rounded border border-slate-700 transition-all">
+                                  <Copy className="w-3.5 h-3.5"/> COPY MD
+                                </button>
+                              </div>
+                            </div>
+                          </div>
+                          
+                          <div className="p-4 bg-slate-950 text-[9px] text-slate-600 font-mono text-center border-t border-slate-800/50">
+                            GOD-MODE // IMMERSIVE_FOCUS_V31 // SECURE_RUNTIME
+                          </div>
+                        </div>
+                      </div>
+                    );
                   }
+
+                  let containerClasses = `ai-response max-w-[90%] w-full rounded-lg p-4 print:max-w-full print:border-none print:shadow-none print:bg-transparent ${msg.role === 'user' ? 'bg-slate-800 border border-slate-700 print:text-black w-auto' : msg.role === 'system' ? 'bg-slate-900 border border-slate-700 text-xs text-center w-full print:hidden' : `${persona.bgColor} border ${persona.borderColor} print:text-black`}`;
 
                   return (
                     <div key={msg.id || i} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
                       <div className={containerClasses}>
-                        
-                        {isMaximized && (
-                          <div className="flex items-center justify-between mb-6 pb-4 border-b border-slate-800 shrink-0">
-                            <div className="flex items-center gap-3">
-                              <BrainCircuit className="w-6 h-6 text-blue-500 animate-pulse" />
-                              <span className="font-bold text-white tracking-wide">IMMERSIVE MODE // GOD-MODE</span>
-                            </div>
-                            <div className="flex gap-3">
-                              {(msg.gamePayload || msg.imageUrl || msg.audioUrl) && (
-                                <button onClick={() => handlePopOut(msg)} className="flex items-center gap-2 px-3 py-1.5 bg-blue-600 hover:bg-blue-500 text-white text-xs font-bold rounded transition-colors" title="Pop out to new browser tab">
-                                  <ExternalLink className="w-4 h-4"/> Pop-Out
-                                </button>
-                              )}
-                              <button onClick={() => setMaximizedIndex(null)} className="p-2 bg-slate-800 hover:bg-red-500 hover:text-white rounded transition-colors text-slate-300" title="Exit Immersive Mode">
-                                <X className="w-5 h-5"/>
-                              </button>
-                            </div>
-                          </div>
-                        )}
 
                         {msg.role === 'ai' && (
                           <div className="flex items-center justify-between mb-2">

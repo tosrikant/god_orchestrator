@@ -113,6 +113,9 @@ public class OrchestratorController {
                             responseToReturn = rawResponse;
                         }
                         
+                        // Track billing
+                        updateBilling(model, responseToReturn.length() / 3);
+                        
                         // Save asynchronously and return the sanitized response (or raw JSON for images)
                         return chatHistoryRepository.save(history)
                                 .thenReturn(responseToReturn);
@@ -178,6 +181,9 @@ public class OrchestratorController {
 
                         history.setMessages(List.of(userMsg, aiMsg));
                         chatHistoryRepository.save(history).subscribe();
+                        
+                        // Update Billing Stats
+                        updateBilling(model, fullResponse.length() / 3);
                     } catch (Exception e) {
                         System.err.println("Async history save failed: " + e.getMessage());
                     }
@@ -216,9 +222,23 @@ public class OrchestratorController {
         return chatHistoryRepository.deleteAllByLabel(label);
     }
 
+    private void updateBilling(String model, int tokenCount) {
+        double costPerToken = model.contains("pro") ? 0.000015 : 0.000005;
+        double totalCost = tokenCount * costPerToken;
+        
+        billingStatsRepository.findById("GLOBAL_STATS")
+                .defaultIfEmpty(new com.example.orchestrator_service.model.BillingStats())
+                .flatMap(stats -> {
+                    stats.addUsage(tokenCount / 2, tokenCount / 2, totalCost);
+                    return billingStatsRepository.save(stats);
+                })
+                .subscribe();
+    }
+
     @GetMapping("/billing")
     public Mono<com.example.orchestrator_service.model.BillingStats> getBilling() {
-        return billingStatsRepository.findById("GLOBAL_STATS");
+        return billingStatsRepository.findById("GLOBAL_STATS")
+                .defaultIfEmpty(new com.example.orchestrator_service.model.BillingStats());
     }
 
     @GetMapping("/health")
