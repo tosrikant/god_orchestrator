@@ -7,7 +7,8 @@ import {
   ExternalLink, Play, Paperclip, Mail, FileText, Calendar,
   Globe, GitBranch, ListTodo, MessageSquare, BookOpen, PenTool, Box,
   Zap, Infinity, Telescope, Atom, Dna, Fingerprint, Radar, Layers, Headphones,
-  FolderSearch, PlusSquare, Hash, Trash2
+  FolderSearch, PlusSquare, Hash, Trash2,
+  Eye, Square, Radio
 } from 'lucide-react';
 
 const SLASH_COMMANDS = [
@@ -158,10 +159,18 @@ export default function GodModeOrchestrator() {
   const [isLabelModalOpen, setIsLabelModalOpen] = useState(false);
   const [newLabelInput, setNewLabelInput] = useState('');
 
+  const [theme, setTheme] = useState(() => localStorage.getItem('god_mode_theme') || 'cyber');
+
   // Persist label list to disk
   useEffect(() => {
     localStorage.setItem('god_mode_labels', JSON.stringify(labels));
   }, [labels]);
+
+  // Apply theme to document
+  useEffect(() => {
+    document.documentElement.dataset.theme = theme;
+    localStorage.setItem('god_mode_theme', theme);
+  }, [theme]);
 
   // Load history whenever the active label changes
   useEffect(() => {
@@ -702,6 +711,15 @@ export default function GodModeOrchestrator() {
         if (finalPrompt.includes('/quantum')) sysPrompt += `\n[INTEGRATION - QUANTUM]: Frame the answer using quantum computing analogies and entanglement models.`;
         if (finalPrompt.includes('/multiverse')) sysPrompt += `\n[INTEGRATION - MULTIVERSE]: Generate 3 distinct parallel timelines of architectural decisions and explicitly evaluate their outcomes.`;
         if (finalPrompt.includes('/autopilot')) sysPrompt += `\n[INTEGRATION - AUTOPILOT]: SYSTEM OVERRIDE: Generate a 3-step autonomous execution plan and execute step 1 immediately.`;
+        
+        // --- COGNITIVE FORMATTING DIRECTIVES ---
+        if (formattingMode === 'visual') {
+          sysPrompt += `\n\n[COGNITIVE FORMATTING - VISUAL]: The user explicitly requested a VISUAL response. You MUST use the 'generate_image' function to create a high-fidelity mockup or diagram illustrating your answer. Do not just describe it; GENERATE IT.`;
+        } else if (formattingMode === 'code') {
+          sysPrompt += `\n\n[COGNITIVE FORMATTING - CODE]: The user explicitly requested a CODE-CENTRIC response. Prioritize raw implementations, snippets, and architectural files. Minimize prose.`;
+        } else if (formattingMode === 'text') {
+          sysPrompt += `\n\n[COGNITIVE FORMATTING - TEXT]: The user explicitly requested a TEXT-HEAVY response. Provide exhaustive documentation, step-by-step guides, and deep-dive analysis.`;
+        }
 
         // ANTI-FIXATION DIRECTIVE TO PREVENT TOOL HALLUCINATION
         sysPrompt += `\n\n[CRITICAL OPERATIONAL DIRECTIVE]: You are a powerful, fully-featured AI. Any tools provided to you (like GitHub or Jira) are purely OPTIONAL extensions. NEVER refuse a user's request by claiming your capabilities are limited to your tools. You MUST answer the prompt directly, generate the requested text/code, or perform the requested simulation using your own vast internal knowledge.`;
@@ -720,6 +738,20 @@ export default function GodModeOrchestrator() {
           if (mcpServers.jira.active) functionDeclarations.push({ name: "get_jira_ticket", description: "Fetch Jira ticket status", parameters: { type: "OBJECT", properties: { ticket_id: { type: "STRING" } }, required: ["ticket_id"] }});
           if (mcpServers.github.active) functionDeclarations.push({ name: "search_repositories", description: "Search GitHub code repos by keyword", parameters: { type: "OBJECT", properties: { query: { type: "STRING" } }, required: ["query"] }});
           
+          if (formattingMode === 'visual') {
+            functionDeclarations.push({
+              name: "generate_image",
+              description: "Generate a high-fidelity image, diagram, or UI mockup based on a prompt.",
+              parameters: {
+                type: "OBJECT",
+                properties: {
+                  prompt: { type: "STRING", description: "Detailed description of the image to generate" }
+                },
+                required: ["prompt"]
+              }
+            });
+          }
+
           if (functionDeclarations.length > 0) {
              activeTools.push({ functionDeclarations: functionDeclarations });
           }
@@ -752,6 +784,35 @@ export default function GodModeOrchestrator() {
         
         const part = await execRes.text();
         let aiResponse = part; 
+
+        // --- TOOL CALL INTERCEPTION ---
+        if (aiResponse.startsWith("[TOOL_CALL]:")) {
+           try {
+              const toolJson = JSON.parse(aiResponse.replace("[TOOL_CALL]:", ""));
+              if (toolJson.name === "generate_image") {
+                 const toolPrompt = toolJson.args.prompt;
+                 addLog(`AI requested high-fidelity generation: "${toolPrompt}"`, 'DesignOps');
+                 
+                 // Reuse existing image generation logic
+                 const imagePayload = { instances: { prompt: toolPrompt }, parameters: { sampleCount: 1 } };
+                 const imgRes = await fetch(`/api/v1/orchestrator/chat?model=imagen-4.0-generate-001`, {
+                   method: 'POST',
+                   headers: { 'Content-Type': 'application/json', 'X-API-KEY': apiKey.trim() },
+                   body: JSON.stringify(imagePayload)
+                 });
+                 const imgData = await imgRes.json();
+                 const base64Image = imgData.predictions?.[0]?.bytesBase64Encoded;
+                 if (base64Image) {
+                    const imageUrl = `data:image/png;base64,${base64Image}`;
+                    setMessages(prev => [...prev, { role: 'ai', text: "Visual synthesis complete.", imageUrl: imageUrl, agent: 'DesignOps' }]);
+                    setIsProcessing(false);
+                    return; // Short-circuit
+                 }
+              }
+           } catch(e) {
+              console.error("Tool execution failed", e);
+           }
+        }
 
         // Finalize Response
         if (!aiResponse) aiResponse = "Empty response.";
@@ -1091,7 +1152,7 @@ export default function GodModeOrchestrator() {
           </div>
         </header>
 
-        <div className="flex-1 flex overflow-hidden">
+        <div className={`flex-1 flex overflow-hidden ${theme === 'retro' ? 'flex-row-reverse' : 'flex-row'}`}>
           
           {/* Left Pane: Session Vault */}
           {!isZenMode && (
@@ -1120,6 +1181,26 @@ export default function GodModeOrchestrator() {
                   ))}
                 </div>
               </div>
+              <div className="p-4 border-b border-slate-800 shrink-0">
+                <h3 className="text-[10px] font-bold text-slate-600 uppercase tracking-widest mb-3 flex items-center gap-2"><Eye className="w-3 h-3" /> Vision Mode</h3>
+                <div className="grid grid-cols-3 gap-1.5">
+                  {[
+                    { id: 'cyber', label: 'CYBER', icon: <Zap className="w-3 h-3" /> },
+                    { id: 'minimal', label: 'MINI', icon: <Square className="w-3 h-3" /> },
+                    { id: 'retro', label: 'RETRO', icon: <Radio className="w-3 h-3" /> }
+                  ].map(v => (
+                    <button
+                      key={v.id}
+                      onClick={() => setTheme(v.id)}
+                      className={`flex flex-col items-center justify-center p-2 rounded border text-[8px] font-bold transition-all ${theme === v.id ? 'bg-blue-600 border-blue-400 text-white shadow-[0_0_10px_rgba(59,130,246,0.3)]' : 'bg-slate-950 border-slate-800 text-slate-500 hover:border-slate-600'}`}
+                    >
+                      {v.icon}
+                      <span className="mt-1">{v.label}</span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+
               <div className="flex-1 flex flex-col overflow-hidden p-4">
                 <h3 className="text-[10px] font-bold text-slate-600 uppercase tracking-widest mb-3 flex items-center gap-2 shrink-0"><Activity className="w-3 h-3" /> System Heartbeat</h3>
                 <div className="flex-1 overflow-y-auto space-y-2 text-xs custom-scrollbar pr-2">
