@@ -1011,12 +1011,12 @@ export default function GodModeOrchestrator() {
 
   return (
     <>
-      <div className="min-h-screen bg-slate-950 text-slate-300 font-mono flex flex-col overflow-hidden selection:bg-blue-900 selection:text-white print:bg-white print:text-black">
+      <div className="h-screen bg-slate-950 text-slate-300 font-mono flex flex-col overflow-hidden selection:bg-blue-900 selection:text-white print:bg-white print:text-black">
         
         <header className="h-14 bg-slate-900 border-b border-slate-800 flex items-center justify-between px-6 shrink-0 z-20 print:hidden shadow-lg">
           <div className="flex items-center gap-3">
             <BrainCircuit className="w-6 h-6 text-blue-500" />
-            <span className="font-bold text-white tracking-wide uppercase">God-Mode // {currentLabel || 'Main Thread'}</span>
+            <span className="font-bold text-white tracking-wide uppercase text-sm">God-Mode // {currentLabel || 'Main Thread'}</span>
           </div>
 
           <div className="flex items-center gap-4 bg-slate-950/50 px-4 py-1.5 rounded-full border border-slate-800 shadow-inner">
@@ -1025,7 +1025,7 @@ export default function GodModeOrchestrator() {
               <select 
                 value={coreModel} 
                 onChange={(e) => setCoreModel(e.target.value)} 
-                className="bg-transparent text-[11px] font-bold text-slate-300 focus:outline-none cursor-pointer"
+                className="bg-transparent text-[10px] font-bold text-slate-300 focus:outline-none cursor-pointer"
               >
                 <option value="gemini-2.5-flash">2.5 FLASH</option>
                 <option value="gemini-2.5-pro">2.5 PRO</option>
@@ -1041,7 +1041,7 @@ export default function GodModeOrchestrator() {
                   setApiKey(e.target.value);
                   localStorage.setItem('gemini_api_key', e.target.value);
                 }}
-                className="bg-transparent text-[11px] text-slate-400 focus:text-white w-24 focus:outline-none transition-all"
+                className="bg-transparent text-[10px] text-slate-400 focus:text-white w-24 focus:outline-none transition-all"
                 placeholder="API KEY"
               />
             </div>
@@ -1054,7 +1054,7 @@ export default function GodModeOrchestrator() {
             <button onClick={handleExportTXT} className="flex items-center gap-2 text-xs bg-slate-800 hover:bg-slate-700 text-slate-300 px-3 py-1.5 rounded border border-slate-700 transition-colors" title="Export Thread (TXT)">
               <Download className="w-3.5 h-3.5" /> TXT
             </button>
-            <button onClick={handlePopOutApp} className="flex items-center gap-2 text-xs bg-slate-800 hover:bg-slate-700 text-slate-300 px-3 py-1.5 rounded border border-slate-700 transition-colors" title={isZenMode ? "Restore Sidebars" : "Maximize Canvas (Zen Mode)"}>
+            <button onClick={() => setIsZenMode(!isZenMode)} className="flex items-center gap-2 text-xs bg-slate-800 hover:bg-slate-700 text-slate-300 px-3 py-1.5 rounded border border-slate-700 transition-colors" title={isZenMode ? "Restore Sidebars" : "Maximize Canvas (Zen Mode)"}>
               {isZenMode ? <Minimize className="w-3.5 h-3.5" /> : <Maximize className="w-3.5 h-3.5" />} {isZenMode ? 'Restore' : 'Zen Mode'}
             </button>
             <button onClick={() => setIsConfigOpen(true)} className="flex items-center gap-2 text-xs bg-slate-800 hover:bg-slate-700 text-slate-300 px-3 py-1.5 rounded border border-slate-700 transition-colors">
@@ -1063,25 +1063,24 @@ export default function GodModeOrchestrator() {
           </div>
         </header>
 
-        <div className="flex-1 grid grid-cols-12 gap-0 overflow-hidden">
+        <div className="flex-1 flex overflow-hidden">
           
           {/* Left Pane: Session Vault */}
           {!isZenMode && (
-            <div className="col-span-3 bg-slate-900/50 border-r border-slate-800 flex flex-col print:hidden no-pdf">
-              <div className="p-4 border-b border-slate-800">
+            <div className="w-72 bg-slate-900/50 border-r border-slate-800 flex flex-col print:hidden no-pdf shrink-0">
+              <div className="p-4 border-b border-slate-800 shrink-0">
                 <div className="flex items-center justify-between mb-4">
                   <h2 className="text-xs font-bold text-slate-400 uppercase tracking-wider flex items-center gap-2"><FolderSearch className="w-4 h-4" /> Chat Vault</h2>
                   <button onClick={() => setIsLabelModalOpen(true)} className="p-1 hover:bg-slate-800 rounded text-blue-400" title="New Session Group">
                     <PlusSquare className="w-4 h-4" />
                   </button>
                 </div>
-                <div className="space-y-2 overflow-y-auto max-h-[40vh] custom-scrollbar">
+                <div className="space-y-2 overflow-y-auto max-h-[30vh] custom-scrollbar pr-2">
                   {labels.map(lbl => (
                     <div 
                       key={lbl} 
                       onClick={() => {
                         setCurrentLabel(lbl);
-                        addSystemLog(`Switching to thread: ${lbl}`, 'info');
                       }}
                       className={`p-2.5 rounded border flex items-center justify-between group cursor-pointer transition-all ${currentLabel === lbl ? 'bg-blue-900/20 border-blue-500/50' : 'bg-slate-950 border-slate-800 hover:border-slate-600'}`}
                     >
@@ -1089,28 +1088,17 @@ export default function GodModeOrchestrator() {
                         <Hash className={`w-3.5 h-3.5 ${currentLabel === lbl ? 'text-blue-400' : 'text-slate-600'}`} />
                         <span className={`text-xs font-bold truncate ${currentLabel === lbl ? 'text-white' : 'text-slate-400'}`}>{lbl}</span>
                       </div>
-                      {lbl !== 'Default' && (
-                        <button 
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            // Handle delete logic later
-                          }} 
-                          className="opacity-0 group-hover:opacity-100 p-1 hover:text-red-500 transition-opacity"
-                        >
-                          <Trash2 className="w-3.5 h-3.5" />
-                        </button>
-                      )}
                     </div>
                   ))}
                 </div>
               </div>
-              <div className="p-4 flex-1 flex flex-col overflow-hidden">
-                <h3 className="text-[10px] font-bold text-slate-600 uppercase tracking-widest mb-3 flex items-center gap-2"><Activity className="w-3 h-3" /> System Heartbeat</h3>
-                <div className="flex-1 overflow-y-auto space-y-2 text-xs custom-scrollbar">
-                  {swarmLogs.slice(-20).map((log, i) => (
-                    <div key={i} className="flex flex-col mb-2 opacity-80">
+              <div className="flex-1 flex flex-col overflow-hidden p-4">
+                <h3 className="text-[10px] font-bold text-slate-600 uppercase tracking-widest mb-3 flex items-center gap-2 shrink-0"><Activity className="w-3 h-3" /> System Heartbeat</h3>
+                <div className="flex-1 overflow-y-auto space-y-2 text-xs custom-scrollbar pr-2">
+                  {swarmLogs.slice(-30).map((log, i) => (
+                    <div key={i} className="flex flex-col mb-2 opacity-80 border-l border-slate-800 pl-2">
                       <span className={`font-bold text-[9px] ${log.agent === 'error' ? 'text-red-500' : 'text-blue-500'}`}>[{log.agent}]</span>
-                      <span className="text-slate-400 pl-2 border-l border-slate-800 ml-1 leading-tight">{log.msg}</span>
+                      <span className="text-slate-400 leading-tight">{log.msg}</span>
                     </div>
                   ))}
                   <div ref={logsEndRef} />
@@ -1119,9 +1107,9 @@ export default function GodModeOrchestrator() {
             </div>
           )}
 
-          {/* Center Pane */}
-          <div className={`${isZenMode ? 'col-span-12' : 'col-span-6'} flex flex-col bg-slate-950 border-r border-slate-800 relative print:col-span-12 print:border-none print:w-full print:bg-white print:text-black`}>
-            <div className="flex-1 overflow-y-auto relative">
+          {/* Center Pane: Chat Core */}
+          <div className="flex-1 flex flex-col bg-slate-950 border-r border-slate-800 relative print:border-none print:bg-white">
+            <div className="flex-1 overflow-y-auto custom-scrollbar relative">
               <div ref={chatContainerRef} className="p-6 space-y-6 min-h-full">
                 {messages.map((msg, i) => {
                   const persona = AGENT_PERSONAS[msg.agent] || AGENT_PERSONAS['General'];
@@ -1354,74 +1342,73 @@ export default function GodModeOrchestrator() {
             </div>
           </div>
 
-          {/* Right Pane: Telemetry */}
+          {/* Right Pane: Telemetry Hub */}
           {!isZenMode && (
-            <div className="col-span-3 bg-slate-900/50 flex flex-col print:hidden no-pdf">
-              <div className="h-10 bg-slate-900 border-b border-slate-800 flex items-center px-4 shrink-0"><Activity className="w-4 h-4 text-slate-400 mr-2" /><span className="text-xs font-bold text-slate-400 uppercase">Live Telemetry</span></div>
-              <div className="p-4 space-y-6 shrink-0">
-                <div>
-                  <h3 className="text-xs text-slate-500 uppercase mb-3">Service Health</h3>
-                  <div className="space-y-2">
-                    <div className="flex justify-between bg-slate-950 p-2 border border-slate-800 rounded text-xs"><span className="text-slate-300">Gemini REST API</span><CheckCircle2 className="w-4 h-4 text-green-500" /></div>
-                    <div className="flex justify-between bg-slate-950 p-2 border border-slate-800 rounded text-xs"><span className="text-slate-300">MCP Registry</span><CheckCircle2 className="w-4 h-4 text-green-500" /></div>
+            <div className="w-80 bg-slate-900/50 flex flex-col print:hidden no-pdf shrink-0 overflow-hidden">
+              <div className="p-4 border-b border-slate-800 shrink-0">
+                <h2 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-4 flex items-center gap-2"><Activity className="w-4 h-4 text-blue-500" /> Live Telemetry</h2>
+                
+                <div className="space-y-4">
+                  <div className="bg-slate-950/50 border border-slate-800 rounded-lg p-3">
+                    <span className="text-[10px] font-bold text-slate-600 uppercase block mb-2">Service Health</span>
+                    <div className="space-y-2 text-[10px]">
+                      <div className="flex justify-between items-center"><span className="text-slate-400">Gemini REST API</span><CheckCircle2 className="w-3.5 h-3.5 text-emerald-500" /></div>
+                      <div className="flex justify-between items-center"><span className="text-slate-400">MCP Registry</span><CheckCircle2 className="w-3.5 h-3.5 text-emerald-500" /></div>
+                    </div>
                   </div>
-                </div>
-                <div>
-                  <h3 className="text-xs text-slate-500 uppercase mb-3">Metrics</h3>
-                  <div className="grid grid-cols-2 gap-2 text-center">
-                    <div className="bg-slate-950 p-3 border border-slate-800 rounded"><div className="text-xl font-bold text-blue-400">{metrics.latency}ms</div><div className="text-[10px] text-slate-500">LATENCY</div></div>
-                    <div className="bg-slate-950 p-3 border border-slate-800 rounded"><div className="text-xl font-bold text-emerald-400">{metrics.cacheHitRate}%</div><div className="text-[10px] text-slate-500">CACHE HIT</div></div>
-                    <div className="bg-slate-950 p-3 border border-slate-800 rounded col-span-2">
-                      <div className="flex items-baseline justify-center gap-2">
-                        <div className="text-xl font-bold text-amber-400">{metrics.tokenUsage.toLocaleString()}</div>
-                        <div className="text-sm font-bold text-emerald-500/80">${metrics.totalCost.toFixed(5)}</div>
-                      </div>
-                      <div className="text-[10px] text-slate-500 mt-1">CUMULATIVE TOKENS & EST. COST</div>
+
+                  <div className="grid grid-cols-2 gap-2">
+                    <div className="bg-slate-950/50 border border-slate-800 rounded-lg p-2 text-center">
+                      <div className="text-lg font-bold text-blue-400 leading-none">{metrics.latency}ms</div>
+                      <div className="text-[9px] font-bold text-slate-600 uppercase mt-1">Latency</div>
+                    </div>
+                    <div className="bg-slate-950/50 border border-slate-800 rounded-lg p-2 text-center">
+                      <div className="text-lg font-bold text-fuchsia-400 leading-none">{metrics.cacheHitRate}%</div>
+                      <div className="text-[9px] font-bold text-slate-600 uppercase mt-1">Cache Hit</div>
+                    </div>
+                  </div>
+
+                  <div className="bg-slate-950/50 border border-emerald-900/30 rounded-lg p-2 flex items-center justify-between px-4">
+                    <div className="flex flex-col">
+                      <span className="text-lg font-bold text-emerald-400 leading-none">{metrics.tokenUsage}</span>
+                      <span className="text-[9px] font-bold text-slate-600 uppercase">Tokens</span>
+                    </div>
+                    <div className="text-right">
+                      <span className="text-xs font-bold text-emerald-500">${metrics.totalCost.toFixed(5)}</span>
                     </div>
                   </div>
                 </div>
               </div>
 
               <div className="flex-1 flex flex-col overflow-hidden">
-                <div className="h-10 bg-slate-900 border-y border-slate-800 flex items-center justify-between px-4 shrink-0">
+                <div className="h-10 bg-slate-900 border-b border-slate-800 flex items-center justify-between px-4 shrink-0">
                   <div className="flex items-center">
-                    <FileJson className="w-4 h-4 text-slate-400 mr-2" />
-                    <span className="text-xs font-bold text-slate-400 uppercase">Raw API Payload</span>
+                    <FileJson className="w-3.5 h-3.5 text-slate-400 mr-2" />
+                    <span className="text-[10px] font-bold text-slate-400 uppercase tracking-tighter">Raw API Payload</span>
                   </div>
-                  <div className="flex items-center gap-3">
-                    <button 
-                      onClick={() => handleCopyMessage(editablePayload)}
-                      className="text-slate-500 hover:text-slate-300 transition-colors"
-                      title="Copy Raw JSON"
-                    >
-                      <Copy className="w-3.5 h-3.5" />
-                    </button>
-                    <button 
-                      onClick={handleExecuteRawPayload} 
-                      disabled={isProcessing} 
-                      className="flex items-center gap-1 text-[10px] font-bold tracking-wider bg-emerald-900/30 text-emerald-400 hover:bg-emerald-500 hover:text-white px-2 py-1 rounded border border-emerald-900/50 transition-colors disabled:opacity-50"
-                      title="Execute edited JSON payload directly against the active model endpoint"
-                    >
-                      <Play className="w-3 h-3" /> Override
+                  <div className="flex items-center gap-2">
+                    <button onClick={() => handleCopyMessage(editablePayload)} className="p-1 text-slate-500 hover:text-slate-300"><Copy className="w-3 h-3" /></button>
+                    <button onClick={handleExecuteRawPayload} disabled={isProcessing} className="flex items-center gap-1 text-[9px] font-bold bg-emerald-900/30 text-emerald-400 hover:bg-emerald-500 hover:text-white px-2 py-0.5 rounded border border-emerald-900/50 transition-all disabled:opacity-50">
+                      <Play className="w-2.5 h-2.5" /> OVERRIDE
                     </button>
                   </div>
                 </div>
-                <div className="flex-1 overflow-hidden flex flex-col bg-slate-950 border-b border-slate-800 p-2">
+                <div className="flex-1 bg-slate-950 p-2 overflow-hidden flex flex-col">
                   <textarea 
                     value={editablePayload}
                     onChange={(e) => setEditablePayload(e.target.value)}
                     spellCheck="false"
-                    className="flex-1 w-full bg-slate-950 text-[10px] text-slate-400 font-mono resize-none focus:outline-none focus:ring-1 focus:ring-blue-500/50 rounded"
+                    className="flex-1 w-full bg-transparent text-[10px] text-slate-500 font-mono resize-none focus:outline-none custom-scrollbar"
                   />
                 </div>
 
-                <div className="h-10 bg-slate-900 flex items-center px-4 shrink-0">
-                              <Terminal className="w-4 h-4 text-slate-400 mr-2" />
-                  <span className="text-xs font-bold text-slate-400 uppercase">System Event Log</span>
+                <div className="h-10 bg-slate-900 border-y border-slate-800 flex items-center px-4 shrink-0">
+                  <Terminal className="w-3.5 h-3.5 text-slate-400 mr-2" />
+                  <span className="text-[10px] font-bold text-slate-400 uppercase tracking-tighter">System Event Log</span>
                 </div>
-                <div className="h-32 overflow-y-auto p-4 bg-slate-950 space-y-1 shrink-0">
+                <div className="h-48 overflow-y-auto p-3 bg-slate-950 custom-scrollbar shrink-0">
                   {systemLogs.map((log, i) => (
-                    <div key={i} className="text-[10px] font-mono flex gap-2">
+                    <div key={i} className="text-[9px] font-mono flex gap-2 mb-1">
                       <span className="text-slate-600 shrink-0">[{log.time}]</span>
                       <span className={`${log.type === 'error' ? 'text-red-500' : log.type === 'success' ? 'text-emerald-500' : 'text-slate-400'}`}>
                         {log.msg}
