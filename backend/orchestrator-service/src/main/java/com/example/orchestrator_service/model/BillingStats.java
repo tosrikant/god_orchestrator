@@ -16,11 +16,18 @@ public class BillingStats {
     private long totalInputTokens;
     private long totalOutputTokens;
     private double totalCost;
+    private double totalVideoCost;
     private long requestCount;
 
     public void addUsage(long input, long output, double cost) {
         this.totalInputTokens += input;
         this.totalOutputTokens += output;
+        this.totalCost += cost;
+        this.requestCount++;
+    }
+
+    public void addVideoUsage(double cost) {
+        this.totalVideoCost += cost;
         this.totalCost += cost;
         this.requestCount++;
     }

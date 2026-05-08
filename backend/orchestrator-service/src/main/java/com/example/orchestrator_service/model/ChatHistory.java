@@ -22,6 +22,8 @@ public class ChatHistory {
         private String text;
         private String imageUrl;
         private String audioUrl;
+        private String videoUrl;
+        private String videoJobId;
         private String gamePayload;
         private String agent;
     }

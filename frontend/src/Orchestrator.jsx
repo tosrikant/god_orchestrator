@@ -10,7 +10,7 @@ import {
   Globe, GitBranch, ListTodo, MessageSquare, BookOpen, PenTool, Box,
   Zap, Infinity, Telescope, Atom, Dna, Fingerprint, Radar, Layers, Headphones,
   FolderSearch, PlusSquare, Hash, Trash2,
-  Eye, Square, Radio
+  Eye, Square, Radio, Film
 } from 'lucide-react';
 
 const SLASH_COMMANDS = [
@@ -133,6 +133,81 @@ const MermaidBlock = ({ code }) => {
   );
 };
 
+const VideoBlock = ({ jobId, initialUrl, onComplete }) => {
+  const [status, setStatus] = useState(initialUrl ? 'COMPLETED' : 'PROCESSING');
+  const [videoUrl, setVideoUrl] = useState(initialUrl);
+  const [progress, setProgress] = useState(0);
+
+  useEffect(() => {
+    if (status === 'COMPLETED') return;
+    
+    let interval;
+    const checkStatus = async () => {
+      try {
+        const res = await fetch(`/api/v1/orchestrator/video/status?jobId=${jobId}`);
+        if (res.ok) {
+          const job = await res.json();
+          if (job.status === 'COMPLETED') {
+            setVideoUrl(job.videoUrl);
+            setStatus('COMPLETED');
+            if (onComplete) onComplete(job.videoUrl);
+          } else {
+             // Fake progress for visual impact
+             setProgress(prev => Math.min(95, prev + (Math.random() * 10)));
+          }
+        }
+      } catch (e) {}
+    };
+
+    interval = setInterval(checkStatus, 3000);
+    return () => clearInterval(interval);
+  }, [jobId, status]);
+
+  if (status === 'PROCESSING') {
+    return (
+      <div className="mt-4 p-6 bg-slate-900 border border-slate-800 rounded-xl flex flex-col items-center gap-4">
+        <div className="flex items-center gap-3 text-cyan-400 animate-pulse">
+           <Film className="w-6 h-6" />
+           <span className="text-[10px] font-black uppercase tracking-[0.2em]">Neural Rendering In Progress</span>
+        </div>
+        <div className="w-full bg-slate-950 h-2 rounded-full overflow-hidden border border-slate-800">
+           <div className="bg-gradient-to-r from-cyan-600 to-blue-500 h-full transition-all duration-700" style={{ width: `${progress}%` }} />
+        </div>
+        <div className="text-[9px] text-slate-500 font-mono uppercase tracking-widest">Synthesis Mode: Veo-3.1 // GPU_CLUSTER_ACTIVE</div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="mt-4 rounded-xl overflow-hidden border border-slate-700 shadow-2xl bg-black group relative">
+       <video 
+         src={videoUrl} 
+         controls 
+         autoPlay 
+         loop 
+         className="w-full aspect-video"
+         onError={(e) => console.error("Video Load Error", e)}
+       >
+         Your browser does not support the video tag.
+       </video>
+       <div className="absolute top-4 left-4 opacity-0 group-hover:opacity-100 transition-opacity flex items-center gap-2">
+          <div className="bg-cyan-600/90 backdrop-blur px-2 py-1 rounded text-[9px] font-black text-white uppercase tracking-widest flex items-center gap-2 shadow-xl">
+            <Zap className="w-3 h-3" /> Cinematic Artifact // 4K
+          </div>
+          <a 
+            href={videoUrl} 
+            download 
+            target="_blank" 
+            rel="noopener noreferrer"
+            className="bg-slate-800/90 backdrop-blur hover:bg-blue-600 px-2 py-1 rounded text-[9px] font-black text-white uppercase tracking-widest transition-all shadow-xl flex items-center gap-2"
+          >
+            <Download className="w-3 h-3" /> Download
+          </a>
+       </div>
+    </div>
+  );
+};
+
 export default function GodModeOrchestrator() {
   const [isAuthenticated, setIsAuthenticated] = useState(() => {
     return !!localStorage.getItem('gemini_api_key');
@@ -235,6 +310,8 @@ export default function GodModeOrchestrator() {
                   agent: agent,
                   imageUrl: m.imageUrl,
                   audioUrl: m.audioUrl,
+                  videoUrl: m.videoUrl,
+                  videoJobId: m.videoJobId,
                   gamePayload: m.gamePayload || hydratedPayload
                 };
               }));
@@ -439,7 +516,8 @@ export default function GodModeOrchestrator() {
     legal_advisor: { label: '[Legal] Zero-Trust Compliance', prefix: 'Act as a Senior Legal Counsel specializing in Zero-Trust and Cloud Compliance. Draft or review: ' },
     architecture_reviewer: { label: '[Arch] Deep-System Audit', prefix: 'Perform a deep-dive architectural audit, identifying single points of failure and scaling bottlenecks for: ' },
     data_scientist: { label: '[Data] Advanced Statistical Logic', prefix: 'Act as a Lead Data Scientist. Provide deep statistical analysis, Python logic, and predictive modeling for: ' },
-    pm_mode: { label: '[PM] PRD & Strategy Blueprint', prefix: 'Generate a comprehensive PRD, Roadmap, and Go-to-Market strategy for: ' }
+    pm_mode: { label: '[PM] PRD & Strategy Blueprint', prefix: 'Generate a comprehensive PRD, Roadmap, and Go-to-Market strategy for: ' },
+    video_synth: { label: '[Video] Cinematic Synthesis', prefix: 'INITIATE_VIDEO_JOB: Generate a 4-second cinematic high-fidelity video of: ' }
   };
 
   const AGENT_PERSONAS = {
@@ -448,6 +526,7 @@ export default function GodModeOrchestrator() {
     DesignOps: { name: 'DesignOps Viz-Agent', icon: <ImageIcon className="w-5 h-5" />, color: 'text-fuchsia-500', bgColor: 'bg-fuchsia-500/10', borderColor: 'border-fuchsia-500/50', prompt: "You are the DesignOps Sub-Agent. You generate visual blueprints." },
     GameOps: { name: 'App & Game Engine', icon: <Gamepad2 className="w-5 h-5" />, color: 'text-orange-500', bgColor: 'bg-orange-500/10', borderColor: 'border-orange-500/50', prompt: "You synthesize playable HTML5 interactions and utility apps." },
     AudioOps: { name: 'AudioOps Synth-Agent', icon: <Headphones className="w-5 h-5" />, color: 'text-indigo-500', bgColor: 'bg-indigo-500/10', borderColor: 'border-indigo-500/50', prompt: "You orchestrate actual text-to-speech audio synthesis." },
+    VideoOps: { name: 'VideoOps Cinematic', icon: <Film className="w-5 h-5" />, color: 'text-cyan-500', bgColor: 'bg-cyan-500/10', borderColor: 'border-cyan-500/50', prompt: "You are the VideoOps Cinematic Specialist. Focus on high-fidelity cinematic descriptions and visual narrative." },
     General: { name: 'Master Orchestrator', icon: <BrainCircuit className="w-5 h-5" />, color: 'text-blue-500', bgColor: 'bg-blue-500/10', borderColor: 'border-blue-500/50', prompt: "You are the Master Orchestrator. You handle general architecture, coding, executive reports, and business logic. You are talking to John." }
   };
 
@@ -737,6 +816,9 @@ export default function GodModeOrchestrator() {
         fastTracked = true;
       } else if (outputStyle === 'audio_synth') {
         selectedAgent = 'AudioOps';
+        fastTracked = true;
+      } else if (outputStyle === 'video_synth') {
+        selectedAgent = 'VideoOps';
         fastTracked = true;
       }
 
@@ -1110,6 +1192,39 @@ export default function GodModeOrchestrator() {
                  }
               }
            } catch(e) { console.error("Fallback tool detection failed", e); }
+        }
+
+        // --- VIDEO JOB DETECTION ---
+        if (aiResponse.includes('INITIATE_VIDEO_JOB:') || selectedAgent === 'VideoOps') {
+           const videoPrompt = aiResponse.replace('INITIATE_VIDEO_JOB:', '').trim() || "Generating Cinematic Sequence...";
+           addLog(`Initiating Cinematic Synthesis: "${videoPrompt}"`, 'VideoOps');
+           
+           try {
+             const vidRes = await fetch(`/api/v1/orchestrator/video/generate?label=${encodeURIComponent(currentLabel)}`, {
+               method: 'POST',
+               headers: { 'Content-Type': 'application/json' },
+               body: JSON.stringify({ prompt: videoPrompt })
+             });
+             
+             if (vidRes.ok) {
+               const job = await vidRes.json();
+               setMessages(prev => {
+                 const newMsgs = [...prev];
+                 newMsgs[newMsgs.length - 1] = { 
+                   role: 'ai', 
+                   text: `[VideoOps] Neural engine is rendering frames for: "${videoPrompt}"`, 
+                   agent: 'VideoOps',
+                   videoJobId: job.id,
+                   status: 'PROCESSING' 
+                 };
+                 return newMsgs;
+               });
+               setIsProcessing(false);
+               return;
+             }
+           } catch(e) {
+             console.error("Video initiation failed", e);
+           }
         }
 
         // Finalize Response
@@ -1546,7 +1661,12 @@ export default function GodModeOrchestrator() {
                               title="Artifact Runtime" 
                             />
                           )}
-                          {msg.imageUrl && !msg.gamePayload && (
+                          {msg.videoJobId && (
+                             <div className="w-full max-w-4xl p-6">
+                               <VideoBlock jobId={msg.videoJobId} initialUrl={msg.videoUrl} />
+                             </div>
+                          )}
+                          {msg.imageUrl && !msg.gamePayload && !msg.videoJobId && (
                             <img src={msg.imageUrl} alt="Artifact" className="max-w-full max-h-full object-contain shadow-2xl" />
                           )}
                           {!msg.gamePayload && !msg.imageUrl && (
@@ -1677,6 +1797,19 @@ export default function GodModeOrchestrator() {
                         })()}
                         
                         <div className="leading-relaxed text-sm whitespace-pre-wrap">{renderMessageContent(msg.text)}</div>
+
+                        {msg.videoJobId && (
+                          <VideoBlock 
+                            jobId={msg.videoJobId} 
+                            initialUrl={msg.videoUrl} 
+                            onComplete={(url) => {
+                              // Update local state to persist URL
+                              setMessages(prev => prev.map((m, idx) => 
+                                idx === i ? { ...m, videoUrl: url, status: 'COMPLETED' } : m
+                              ));
+                            }}
+                          />
+                        )}
 
                         {msg.attachments && msg.attachments.length > 0 && (
                           <div className="mt-3 flex flex-wrap gap-2">

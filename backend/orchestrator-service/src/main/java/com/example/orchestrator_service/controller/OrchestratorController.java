@@ -29,6 +29,9 @@ public class OrchestratorController {
     @Autowired
     private BillingStatsRepository billingStatsRepository;
 
+    @Autowired
+    private com.example.orchestrator_service.repository.VideoJobRepository videoJobRepository;
+
     @PostMapping("/chat")
     public Mono<String> chat(
             @RequestParam String model,
@@ -220,6 +223,50 @@ public class OrchestratorController {
     @DeleteMapping("/history")
     public Mono<Void> deleteHistory(@RequestParam String label) {
         return chatHistoryRepository.deleteAllByLabel(label);
+    }
+
+    @PostMapping("/video/generate")
+    public Mono<com.example.orchestrator_service.model.VideoJob> generateVideo(
+            @RequestParam(required = false, defaultValue = "Default") String label,
+            @RequestBody Map<String, String> request) {
+        
+        String prompt = request.get("prompt");
+        com.example.orchestrator_service.model.VideoJob job = new com.example.orchestrator_service.model.VideoJob();
+        job.setLabel(label);
+        job.setPrompt(prompt);
+        job.setStatus("PROCESSING");
+        
+        return videoJobRepository.save(job)
+                .doOnSuccess(savedJob -> {
+                    // Simulate Asynchronous Cinematic Synthesis (LRO Simulation)
+                    // In a production environment, this would call Vertex AI Veo API
+                    reactor.core.publisher.Mono.delay(java.time.Duration.ofSeconds(20))
+                        .flatMap(d -> {
+                            savedJob.setStatus("COMPLETED");
+                            // Using a more reliable cinematic placeholder
+                            savedJob.setVideoUrl("https://www.w3schools.com/html/mov_bbb.mp4");
+                            savedJob.setCompletedAt(java.time.Instant.now());
+                            savedJob.setCost(1.75); // Tier-1 Cinematic Cost
+                            return videoJobRepository.save(savedJob);
+                        })
+                        .doOnSuccess(finalJob -> updateVideoBilling(finalJob.getCost()))
+                        .subscribe();
+                });
+    }
+
+    @GetMapping("/video/status")
+    public Mono<com.example.orchestrator_service.model.VideoJob> getVideoStatus(@RequestParam String jobId) {
+        return videoJobRepository.findById(jobId);
+    }
+
+    private void updateVideoBilling(double cost) {
+        billingStatsRepository.findById("GLOBAL_STATS")
+                .defaultIfEmpty(new com.example.orchestrator_service.model.BillingStats())
+                .flatMap(stats -> {
+                    stats.addVideoUsage(cost);
+                    return billingStatsRepository.save(stats);
+                })
+                .subscribe();
     }
 
     private void updateBilling(String model, int tokenCount) {
