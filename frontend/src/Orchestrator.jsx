@@ -202,6 +202,25 @@ export default function GodModeOrchestrator() {
   const [localDataset, setLocalDataset] = useState(null);
 
   const [metrics, setMetrics] = useState({ latency: 0, tokenUsage: 0, totalCost: 0, cacheHitRate: 98, activeNodes: 3, backendStatus: 'ONLINE' });
+  const [billingStats, setBillingStats] = useState({ totalInputTokens: 0, totalOutputTokens: 0, totalCost: 0, requestCount: 0 });
+
+  // Periodically fetch global billing stats
+  useEffect(() => {
+    if (isAuthenticated) {
+      const fetchBilling = async () => {
+        try {
+          const res = await fetch('/api/v1/orchestrator/billing');
+          if (res.ok) {
+            const data = await res.json();
+            setBillingStats(data);
+          }
+        } catch (err) { console.error('Billing fetch failed:', err); }
+      };
+      fetchBilling();
+      const interval = setInterval(fetchBilling, 30000);
+      return () => clearInterval(interval);
+    }
+  }, [isAuthenticated]);
   const [lastApiPayload, setLastApiPayload] = useState(null);
   const [editablePayload, setEditablePayload] = useState('{\n  // Backend Gateway Mode Active\n}');
   
@@ -1387,13 +1406,27 @@ export default function GodModeOrchestrator() {
                     </div>
                   </div>
 
-                  <div className="bg-slate-950/50 border border-emerald-900/30 rounded-lg p-2 flex items-center justify-between px-4">
-                    <div className="flex flex-col">
-                      <span className="text-lg font-bold text-emerald-400 leading-none">{metrics.tokenUsage}</span>
-                      <span className="text-[9px] font-bold text-slate-600 uppercase">Tokens</span>
+                  <div className="bg-slate-950/50 border border-emerald-900/30 rounded-lg p-3">
+                    <span className="text-[10px] font-bold text-slate-600 uppercase block mb-2">Lifetime Financials</span>
+                    <div className="flex items-center justify-between mb-3 border-b border-slate-800 pb-2">
+                      <div className="flex flex-col">
+                        <span className="text-xl font-bold text-emerald-400 leading-none">${billingStats.totalCost.toFixed(4)}</span>
+                        <span className="text-[8px] font-bold text-slate-500 uppercase mt-1">Accrued Cost (USD)</span>
+                      </div>
+                      <div className="text-right">
+                        <span className="text-sm font-bold text-slate-300 leading-none">{billingStats.requestCount}</span>
+                        <span className="text-[8px] font-bold text-slate-500 uppercase block">Requests</span>
+                      </div>
                     </div>
-                    <div className="text-right">
-                      <span className="text-xs font-bold text-emerald-500">${metrics.totalCost.toFixed(5)}</span>
+                    <div className="grid grid-cols-2 gap-4 text-[10px]">
+                      <div className="flex flex-col">
+                        <span className="text-slate-400 font-bold">{(billingStats.totalInputTokens / 1000).toFixed(1)}k</span>
+                        <span className="text-[8px] text-slate-600 uppercase">Input Tokens</span>
+                      </div>
+                      <div className="flex flex-col text-right">
+                        <span className="text-slate-400 font-bold">{(billingStats.totalOutputTokens / 1000).toFixed(1)}k</span>
+                        <span className="text-[8px] text-slate-600 uppercase">Output Tokens</span>
+                      </div>
                     </div>
                   </div>
                 </div>

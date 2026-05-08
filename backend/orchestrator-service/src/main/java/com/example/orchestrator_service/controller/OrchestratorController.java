@@ -20,6 +20,9 @@ public class OrchestratorController {
     @Autowired
     private com.example.orchestrator_service.repository.ChatHistoryRepository chatHistoryRepository;
 
+    @Autowired
+    private com.example.orchestrator_service.repository.BillingStatsRepository billingStatsRepository;
+
     @PostMapping("/chat")
     public Mono<String> chat(
             @RequestParam String model,
@@ -39,14 +42,16 @@ public class OrchestratorController {
                 })
                 .doOnNext(cleanText -> {
                     try {
+                        // 1. Persist Chat History
                         com.example.orchestrator_service.model.ChatHistory history = new com.example.orchestrator_service.model.ChatHistory();
                         history.setSessionId("default-session");
                         history.setLabel(label);
                         history.setTimestamp(java.time.Instant.now());
                         
+                        String userText = request.getContents().get(request.getContents().size() - 1).getParts().get(0).getText();
                         com.example.orchestrator_service.model.ChatHistory.Message userMsg = new com.example.orchestrator_service.model.ChatHistory.Message();
                         userMsg.setRole("user");
-                        userMsg.setText(request.getContents().get(request.getContents().size() - 1).getParts().get(0).getText());
+                        userMsg.setText(userText);
 
                         com.example.orchestrator_service.model.ChatHistory.Message aiMsg = new com.example.orchestrator_service.model.ChatHistory.Message();
                         aiMsg.setRole("model");
@@ -54,10 +59,29 @@ public class OrchestratorController {
                         
                         history.setMessages(java.util.List.of(userMsg, aiMsg));
                         chatHistoryRepository.save(history).subscribe();
+
+                        // 2. Update Billing Stats
+                        long inputTokens = (userText.length() / 4) + 10; // Rough token estimate
+                        long outputTokens = (cleanText.length() / 4) + 10;
+                        double pricePer1M = model.contains("flash") ? 0.075 : 1.25;
+                        double cost = ((inputTokens + outputTokens) / 1000000.0) * pricePer1M;
+
+                        com.example.orchestrator_service.model.BillingStats stats = billingStatsRepository.findById("GLOBAL_STATS")
+                            .orElse(new com.example.orchestrator_service.model.BillingStats());
+                        
+                        stats.addUsage(inputTokens, outputTokens, cost);
+                        billingStatsRepository.save(stats);
+
                     } catch (Exception e) {
-                        System.err.println("Database Save Failed: " + e.getMessage());
+                        System.err.println("Persistence Ops Failed: " + e.getMessage());
                     }
                 });
+    }
+
+    @GetMapping("/billing")
+    public com.example.orchestrator_service.model.BillingStats getBilling() {
+        return billingStatsRepository.findById("GLOBAL_STATS")
+            .orElse(new com.example.orchestrator_service.model.BillingStats());
     }
 
     @GetMapping("/history")
