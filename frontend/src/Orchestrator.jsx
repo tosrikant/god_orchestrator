@@ -400,9 +400,18 @@ export default function GodModeOrchestrator() {
     }
   };
 
-  const handleEditMessage = (index) => {
+  const handleEditMessage = async (index) => {
     if (isProcessing) return;
     const targetMsg = messages[index];
+    
+    // Wipe database history for this label to prevent ghost messages
+    try {
+      await fetch(`/api/v1/orchestrator/history?label=${encodeURIComponent(currentLabel)}`, { method: 'DELETE' });
+      addSystemLog(`Thread [${currentLabel}] persistent buffer cleared for rewrite.`, 'success');
+    } catch (err) {
+      console.error('Buffer clear failed:', err);
+    }
+
     setChatInput(targetMsg.text);
     setMessages(prev => prev.slice(0, index)); 
     addSystemLog('Thread rewound. Ready to edit prompt.', 'info');
@@ -1169,16 +1178,26 @@ export default function GodModeOrchestrator() {
                           </div>
                         )}
 
-                        {msg.role === 'user' && (
-                          <div className="flex items-center justify-between mb-2 print:hidden">
-                            <button onClick={() => handleEditMessage(i)} disabled={isProcessing} className="text-slate-500 hover:text-blue-400 transition-colors disabled:opacity-50" title="Edit & Resubmit Prompt">
-                              <Edit2 className="w-3.5 h-3.5" />
-                            </button>
-                            <div className="flex items-center gap-1 text-[10px] font-bold uppercase tracking-wider text-slate-500">
-                              Client Identity <Activity className="w-3 h-3" />
+                        {msg.role === 'user' && (() => {
+                          const userMsgIndices = messages
+                            .map((m, idx) => m.role === 'user' ? idx : -1)
+                            .filter(idx => idx !== -1);
+                          const isRecent = userMsgIndices.slice(-2).includes(i);
+                          
+                          return (
+                            <div className="flex items-center justify-between mb-2 print:hidden">
+                              {isRecent && (
+                                <button onClick={() => handleEditMessage(i)} disabled={isProcessing} className="text-slate-500 hover:text-blue-400 transition-colors disabled:opacity-50" title="Edit & Resubmit Prompt">
+                                  <Edit2 className="w-3.5 h-3.5" />
+                                </button>
+                              )}
+                              {!isRecent && <div className="w-4 h-4"></div>}
+                              <div className="flex items-center gap-1 text-[10px] font-bold uppercase tracking-wider text-slate-500">
+                                Client Identity <Activity className="w-3 h-3" />
+                              </div>
                             </div>
-                          </div>
-                        )}
+                          );
+                        })()}
                         
                         <div className="leading-relaxed text-sm whitespace-pre-wrap">{renderMessageContent(msg.text)}</div>
 
