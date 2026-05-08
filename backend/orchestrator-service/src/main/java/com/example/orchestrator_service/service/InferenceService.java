@@ -21,15 +21,25 @@ public class InferenceService {
                         .build(model))
                 .contentType(org.springframework.http.MediaType.APPLICATION_JSON)
                 .bodyValue(request)
-                .exchangeToMono(response -> {
-                    if (response.statusCode().isError()) {
-                        return response.bodyToMono(String.class).flatMap(errorBody -> 
-                            Mono.error(new RuntimeException("Inference API Error (" + response.statusCode() + "): " + errorBody))
-                        );
-                    } else {
-                        return response.bodyToMono(String.class);
-                    }
-                })
+                .retrieve()
+                .bodyToMono(String.class)
                 .doOnError(e -> System.err.println("Inference Error: " + e.getMessage()));
+    }
+
+    public reactor.core.publisher.Flux<String> streamGenerateContent(String model, String apiKey, Object request) {
+        String method = ":streamGenerateContent";
+        // Note: Imagen doesn't support streaming, so we only use this for text models
+        
+        return geminiWebClient.post()
+                .uri(uriBuilder -> uriBuilder
+                        .path("/models/{model}" + method)
+                        .queryParam("key", apiKey)
+                        .queryParam("alt", "sse") // Use Server-Sent Events for cleaner streaming
+                        .build(model))
+                .contentType(org.springframework.http.MediaType.APPLICATION_JSON)
+                .bodyValue(request)
+                .retrieve()
+                .bodyToFlux(String.class)
+                .doOnError(e -> System.err.println("Inference Stream Error: " + e.getMessage()));
     }
 }

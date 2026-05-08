@@ -196,7 +196,24 @@ export default function GodModeOrchestrator() {
                 audioUrl: m.audioUrl,
                 gamePayload: m.gamePayload
               })));
-              setMessages(flattened);
+
+              // Advanced De-duplication: Remove identical consecutive turns (User + AI pairs)
+              const cleanHistory = [];
+              for (let i = 0; i < flattened.length; i++) {
+                const current = flattened[i];
+                if (i >= 2 && current.role === 'ai' && flattened[i-1].role === 'user') {
+                  const prevAi = cleanHistory[cleanHistory.length - 1];
+                  const prevUser = cleanHistory[cleanHistory.length - 2];
+                  if (prevAi && prevUser && 
+                      current.text === prevAi.text && 
+                      flattened[i-1].text === prevUser.text) {
+                    continue; // Skip duplicate turn
+                  }
+                }
+                cleanHistory.push(current);
+              }
+
+              setMessages(cleanHistory);
             } else {
               setMessages([{ role: 'system', text: `THREAD INITIALIZED: ${currentLabel}` }]);
             }
@@ -376,7 +393,11 @@ export default function GodModeOrchestrator() {
     app_html5: { label: '[Interactive] Web App (Tools)', prefix: 'INITIATE_WEB_APP: Generate a functional HTML5 web app for: ' },
     image_photorealistic: { label: '[Image] Photorealistic', prefix: 'Generate a highly detailed, photorealistic 8k resolution image of: ' },
     image_blueprint: { label: '[Image] Technical Blueprint', prefix: 'Generate an image of a technical blueprint, white lines on blue background, schematic style: ' },
-    audio_synth: { label: '[Audio] TTS Synthesis', prefix: 'INITIATE_AUDIO_JOB: Provide a dramatic reading or vocal explanation of: ' }
+    audio_synth: { label: '[Audio] TTS Synthesis', prefix: 'INITIATE_AUDIO_JOB: Provide a dramatic reading or vocal explanation of: ' },
+    legal_advisor: { label: '[Legal] Zero-Trust Compliance', prefix: 'Act as a Senior Legal Counsel specializing in Zero-Trust and Cloud Compliance. Draft or review: ' },
+    architecture_reviewer: { label: '[Arch] Deep-System Audit', prefix: 'Perform a deep-dive architectural audit, identifying single points of failure and scaling bottlenecks for: ' },
+    data_scientist: { label: '[Data] Advanced Statistical Logic', prefix: 'Act as a Lead Data Scientist. Provide deep statistical analysis, Python logic, and predictive modeling for: ' },
+    pm_mode: { label: '[PM] PRD & Strategy Blueprint', prefix: 'Generate a comprehensive PRD, Roadmap, and Go-to-Market strategy for: ' }
   };
 
   const AGENT_PERSONAS = {
@@ -548,7 +569,15 @@ export default function GodModeOrchestrator() {
       console.error('Buffer clear failed:', err);
     }
 
-    setChatInput(targetMsg.text);
+    // Strip cognitive prefixes for a cleaner edit experience
+    let rawText = targetMsg.text;
+    Object.values(OUTPUT_STYLES).forEach(style => {
+      if (style.prefix && rawText.startsWith(style.prefix)) {
+        rawText = rawText.replace(style.prefix, '');
+      }
+    });
+
+    setChatInput(rawText);
     setMessages(prev => prev.slice(0, index)); 
     addSystemLog('Thread rewound. Ready to edit prompt.', 'info');
     setTimeout(() => inputRef.current?.focus(), 50);
@@ -796,51 +825,22 @@ export default function GodModeOrchestrator() {
            throw new Error("No audio payload returned from TTS model.");
         }
 
-      } else if (selectedAgent === 'GameOps') {
-        addLog(`Orchestrating high-speed interactive synthesis...`, selectedAgent);
-        addSystemLog('POST /v1beta/models/gemini-1.5-flash -> HTML5_ENGINE', 'info');
-        
-        const apiContents = currentHistory.filter(m => m.role !== 'system').map(m => {
-          const parts = [];
-          if (m.text) parts.push({ text: m.text });
-          if (m.attachments) {
-            m.attachments.forEach(att => parts.push({ inlineData: { mimeType: att.mimeType, data: att.base64 } }));
-          }
-          if (parts.length === 0) parts.push({ text: " " });
-          return { role: m.role === 'ai' ? 'model' : 'user', parts };
-        });
-        apiContents.push({ role: 'user', parts: [{ text: finalPrompt }] });
-
+        // CONVERTED GAME/APP OPS TO USE STREAMING PIPELINE FOR STABILITY
+        selectedAgent = 'GameOps';
         const gameSysPrompt = AGENT_PERSONAS['GameOps'].prompt + 
           "\n\n[CRITICAL]: You MUST output ONE COMPLETE HTML FILE containing all CSS and JS. Wrap it in a ```html block.";
-
-        const executionPayload = {
+        
+        sysPrompt = gameSysPrompt;
+        effectiveModel = 'gemini-1.5-flash'; // Optimized for high-speed app synthesis
+        
+        executionPayload = {
           contents: apiContents,
           systemInstruction: { parts: [{ text: gameSysPrompt }] },
           generationConfig: { temperature: 0.7 }
         };
 
-        const execRes = await fetch(`/api/v1/orchestrator/chat?model=gemini-1.5-flash&label=${encodeURIComponent(currentLabel)}`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json', 'X-API-KEY': apiKey.trim() },
-          body: JSON.stringify(executionPayload)
-        });
-
-        if (!execRes.ok) throw new Error(`Game Engine Failed (HTTP ${execRes.status})`);
-        
-        const aiResponseRaw = await execRes.text();
-        let extractedGamePayload = null;
-        let aiResponse = aiResponseRaw;
-
-        if (aiResponseRaw.includes('```html')) {
-          const match = aiResponseRaw.match(/```html\n?([\s\S]*?)```/i);
-          if (match) {
-            extractedGamePayload = match[1];
-            aiResponse = aiResponseRaw.replace(/```html\n?([\s\S]*?)```/i, '\n_[Interactive Application Mounted Below]_\n');
-          }
-        }
-
-        setMessages(prev => [...prev, { role: 'ai', text: aiResponse, agent: 'GameOps', gamePayload: extractedGamePayload }]);
+        addLog(`Igniting High-Speed Game Engine...`, selectedAgent);
+        addSystemLog('STREAMING_GATEWAY_V31 -> HTML5_EVOLUTION_MODE', 'info');
 
       } else {
         const apiContents = currentHistory.filter(m => m.role !== 'system').map(m => {
@@ -931,10 +931,10 @@ export default function GodModeOrchestrator() {
 
         addLog(`Routing to Java Gateway (Port 8082)...`, selectedAgent);
         
-        // --- CALLING THE NEW JAVA BACKEND GATEWAY ---
-        const GATEWAY_URL = "/api/v1/orchestrator/chat";
+        // --- CALLING THE NEW STREAMING GATEWAY ---
+        const GATEWAY_URL = "/api/v1/orchestrator/chat-stream";
         
-        let execRes = await fetch(`${GATEWAY_URL}?model=${effectiveModel}&label=${encodeURIComponent(currentLabel)}`, {
+        const response = await fetch(`${GATEWAY_URL}?model=${effectiveModel}&label=${encodeURIComponent(currentLabel)}`, {
           method: 'POST',
           headers: { 
             'Content-Type': 'application/json',
@@ -943,15 +943,44 @@ export default function GodModeOrchestrator() {
           body: JSON.stringify(executionPayload)
         });
         
-        if (!execRes.ok) {
-           let exactError = execRes.statusText;
-           try { const errData = await execRes.json(); exactError = errData.error.message || exactError; } catch(e){}
-           throw new Error(`Gateway Execution Failed (HTTP ${execRes.status}): ${exactError}`);
+        if (!response.ok) {
+           let exactError = response.statusText;
+           try { const errData = await response.json(); exactError = errData.error.message || exactError; } catch(e){}
+           throw new Error(`Gateway Execution Failed (HTTP ${response.status}): ${exactError}`);
         }
         
-        const part = await execRes.text();
-        addSystemLog(`[Diagnostic] Gateway Response Received. Length: ${part.length} chars.`, 'info');
-        let aiResponse = part.trim(); 
+        // STREAMING READER
+        const reader = response.body.getReader();
+        const decoder = new TextDecoder();
+        let fullAiText = '';
+        
+        // Add a placeholder message that will be updated
+        setMessages(prev => [...prev, { role: 'ai', text: '...', agent: selectedAgent, isStreaming: true }]);
+        
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+          
+          const chunk = decoder.decode(value, { stream: true });
+          const lines = chunk.split('\n');
+          
+          for (const line of lines) {
+            if (line.startsWith('data:')) {
+              const token = line.substring(5).trim(); // Gateway sends raw text in data
+              if (token) {
+                fullAiText += token;
+                setMessages(prev => {
+                  const newMsgs = [...prev];
+                  newMsgs[newMsgs.length - 1].text = fullAiText;
+                  return newMsgs;
+                });
+              }
+            }
+          }
+        }
+
+        addSystemLog(`[Diagnostic] Stream Complete. Length: ${fullAiText.length} chars.`, 'info');
+        let aiResponse = fullAiText.trim(); 
 
         // --- TOOL CALL INTERCEPTION ---
         if (aiResponse.startsWith("[TOOL_CALL]:")) {
@@ -972,7 +1001,11 @@ export default function GodModeOrchestrator() {
                  const base64Image = imgData.predictions?.[0]?.bytesBase64Encoded;
                  if (base64Image) {
                     const imageUrl = `data:image/png;base64,${base64Image}`;
-                    setMessages(prev => [...prev, { role: 'ai', text: "Visual synthesis complete.", imageUrl: imageUrl, agent: 'DesignOps' }]);
+                    setMessages(prev => {
+                      const newMsgs = [...prev];
+                      newMsgs[newMsgs.length - 1] = { role: 'ai', text: "Visual synthesis complete.", imageUrl: imageUrl, agent: 'DesignOps' };
+                      return newMsgs;
+                    });
                     setIsProcessing(false);
                     return; // Short-circuit
                  }
@@ -989,25 +1022,25 @@ export default function GodModeOrchestrator() {
               const base64Image = imgData.predictions?.[0]?.bytesBase64Encoded;
               if (base64Image) {
                  const imageUrl = `data:image/png;base64,${base64Image}`;
-                 setMessages(prev => [...prev, { role: 'ai', text: "High-fidelity synthesis successful.", imageUrl: imageUrl, agent: 'DesignOps' }]);
+                 setMessages(prev => {
+                   const newMsgs = [...prev];
+                   newMsgs[newMsgs.length - 1] = { role: 'ai', text: "High-fidelity synthesis successful.", imageUrl: imageUrl, agent: 'DesignOps' };
+                   return newMsgs;
+                 });
                  setIsProcessing(false);
                  return;
               }
            } catch(e) {}
         }
 
-        // --- FALLBACK: DETECT STRINGIFIED TOOL CALLS (As seen in screenshot) ---
+        // --- FALLBACK: DETECT STRINGIFIED TOOL CALLS ---
         if (!aiResponse.startsWith("[TOOL_CALL]:") && (aiResponse.includes('generate_image') || aiResponse.includes('tool_code'))) {
            try {
               let promptToUse = null;
-              
-              // Pattern 1: JSON with tool_code (Flexible quotes and spacing)
               if (aiResponse.includes('"tool_code"')) {
                  const match = aiResponse.match(/"tool_code":\s*"[^"]*generate_image\(prompt=['"]([^'"]+)['"]/);
                  if (match) promptToUse = match[1];
               }
-              
-              // Pattern 2: Naked generate_image call
               if (!promptToUse) {
                  const match = aiResponse.match(/generate_image\(prompt=['"]([^'"]+)['"]\)/);
                  if (match) promptToUse = match[1];
@@ -1025,7 +1058,11 @@ export default function GodModeOrchestrator() {
                  const base64Image = imgData.predictions?.[0]?.bytesBase64Encoded;
                  if (base64Image) {
                     const imageUrl = `data:image/png;base64,${base64Image}`;
-                    setMessages(prev => [...prev, { role: 'ai', text: "Visual synthesis complete.", imageUrl: imageUrl, agent: 'DesignOps' }]);
+                    setMessages(prev => {
+                      const newMsgs = [...prev];
+                      newMsgs[newMsgs.length - 1] = { role: 'ai', text: "Visual synthesis complete.", imageUrl: imageUrl, agent: 'DesignOps' };
+                      return newMsgs;
+                    });
                     setIsProcessing(false);
                     return;
                  }
@@ -1071,7 +1108,17 @@ export default function GodModeOrchestrator() {
         }
 
         addLog(`Synthesis complete.`, selectedAgent);
-        setMessages(prev => [...prev, { role: 'ai', text: aiResponse, agent: selectedAgent, gamePayload: extractedGamePayload }]);
+        setMessages(prev => {
+          const newMsgs = [...prev];
+          newMsgs[newMsgs.length - 1] = { 
+            role: 'ai', 
+            text: aiResponse, 
+            agent: selectedAgent, 
+            gamePayload: extractedGamePayload,
+            isStreaming: false 
+          };
+          return newMsgs;
+        });
       }
 
       const latency = Date.now() - startTime;
@@ -1211,14 +1258,19 @@ export default function GodModeOrchestrator() {
 
   const renderMessageContent = (text) => {
     if (!text) return null;
-    const blockRegex = /(```[\s\S]*?```)/g;
+    const blockRegex = /(```[\s\S]*?```|```[\s\S]*?$)/g;
     const blocks = text.split(blockRegex);
     
     return blocks.map((block, i) => {
-      if (block.startsWith('```') && block.endsWith('```')) {
+      if (block.startsWith('```')) {
         const lines = block.split('\n');
         const lang = lines[0].replace('```', '').trim().toLowerCase();
-        const code = lines.slice(1, -1).join('\n');
+        let code = lines.slice(1).join('\n');
+        
+        // Handle open blocks during streaming
+        if (code.endsWith('```')) {
+           code = code.slice(0, -3);
+        }
         
         if (lang === 'mermaid') {
           return <MermaidBlock key={i} code={code} />;

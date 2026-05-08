@@ -9,8 +9,11 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.*;
 import reactor.core.publisher.Mono;
 import reactor.core.publisher.Flux;
-
+import org.springframework.http.MediaType;
 import java.util.Map;
+import java.util.stream.Collectors;
+import java.util.List;
+import java.util.ArrayList;
 
 @RestController
 @RequestMapping("/api/v1/orchestrator")
@@ -66,12 +69,13 @@ public class OrchestratorController {
                         com.example.orchestrator_service.model.ChatHistory.Message userMsg = new com.example.orchestrator_service.model.ChatHistory.Message();
                         userMsg.setRole("user");
                         
-                        // Extract user message text from request body (last message in 'contents')
+                        // Extract user message text from request body
                         Object contentsObj = request.get("contents");
+                        Object instancesObj = request.get("instances");
+                        
                         if (contentsObj instanceof java.util.List) {
                             java.util.List<?> contents = (java.util.List<?>) contentsObj;
                             if (!contents.isEmpty()) {
-                                // Find the last message with role 'user'
                                 for (int i = contents.size() - 1; i >= 0; i--) {
                                     Object content = contents.get(i);
                                     if (content instanceof Map) {
@@ -89,14 +93,27 @@ public class OrchestratorController {
                                     }
                                 }
                             }
+                        } else if (instancesObj instanceof java.util.List && !((java.util.List<?>) instancesObj).isEmpty()) {
+                            // IMAGEN CASE: Prompt is in instances[0].prompt
+                            Object firstInstance = ((java.util.List<?>) instancesObj).get(0);
+                            if (firstInstance instanceof Map) {
+                                userMsg.setText((String) ((Map<?, ?>) firstInstance).get("prompt"));
+                            }
                         }
+
+                        if (userMsg.getText() == null) userMsg.setText("Orchestration Request");
 
                         history.setMessages(java.util.List.of(userMsg, aiMsg));
                         
                         // Extract the sanitized text to return to the frontend
                         String responseToReturn = aiMsg.getText();
                         
-                        // Save asynchronously and return the sanitized response
+                        // IF it is an image generation (Imagen), we MUST return the full JSON so the frontend can extract base64
+                        if (root.has("predictions")) {
+                            responseToReturn = rawResponse;
+                        }
+                        
+                        // Save asynchronously and return the sanitized response (or raw JSON for images)
                         return chatHistoryRepository.save(history)
                                 .thenReturn(responseToReturn);
                                 
@@ -104,6 +121,89 @@ public class OrchestratorController {
                         return Mono.just(rawResponse);
                     }
                 });
+    }
+
+    @PostMapping(value = "/chat-stream", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
+    public Flux<String> chatStream(
+            @RequestParam String model,
+            @RequestParam(required = false, defaultValue = "Default") String label,
+            @RequestHeader("X-API-KEY") String apiKey,
+            @RequestBody Map<String, Object> request) {
+        
+        StringBuilder fullResponse = new StringBuilder();
+        
+        return inferenceService.streamGenerateContent(model, apiKey, request)
+                .map(chunk -> {
+                    String text = parseGeminiStreamChunk(chunk);
+                    fullResponse.append(text);
+                    return text;
+                })
+                .doOnComplete(() -> {
+                    // Persistence at the end of the stream
+                    try {
+                        com.example.orchestrator_service.model.ChatHistory history = new com.example.orchestrator_service.model.ChatHistory();
+                        history.setLabel(label);
+                        history.setTimestamp(java.time.Instant.now());
+                        
+                        com.example.orchestrator_service.model.ChatHistory.Message aiMsg = new com.example.orchestrator_service.model.ChatHistory.Message();
+                        aiMsg.setRole("model");
+                        aiMsg.setText(fullResponse.toString());
+                        aiMsg.setAgent("Orchestrator");
+
+                        com.example.orchestrator_service.model.ChatHistory.Message userMsg = new com.example.orchestrator_service.model.ChatHistory.Message();
+                        userMsg.setRole("user");
+                        
+                        Object contentsObj = request.get("contents");
+                        if (contentsObj instanceof List) {
+                            List<?> contents = (List<?>) contentsObj;
+                            if (!contents.isEmpty()) {
+                                for (int i = contents.size() - 1; i >= 0; i--) {
+                                    Object content = contents.get(i);
+                                    if (content instanceof Map) {
+                                        Map<?, ?> contentMap = (Map<?, ?>) content;
+                                        if ("user".equals(contentMap.get("role"))) {
+                                            Object partsObj = contentMap.get("parts");
+                                            if (partsObj instanceof List && !((List<?>) partsObj).isEmpty()) {
+                                                Object firstPart = ((List<?>) partsObj).get(0);
+                                                if (firstPart instanceof Map) {
+                                                    userMsg.setText((String) ((Map<?, ?>) firstPart).get("text"));
+                                                }
+                                            }
+                                            break;
+                                        }
+                                    }
+                                }
+                            }
+                        }
+
+                        history.setMessages(List.of(userMsg, aiMsg));
+                        chatHistoryRepository.save(history).subscribe();
+                    } catch (Exception e) {
+                        System.err.println("Async history save failed: " + e.getMessage());
+                    }
+                });
+    }
+
+    private String parseGeminiStreamChunk(String chunk) {
+        if (chunk == null) return "";
+        String cleanJson = chunk;
+        if (chunk.startsWith("data: ")) {
+            cleanJson = chunk.substring(6);
+        }
+        
+        try {
+            ObjectMapper mapper = new ObjectMapper();
+            JsonNode root = mapper.readTree(cleanJson);
+            if (root.has("candidates")) {
+                JsonNode candidate = root.path("candidates").get(0);
+                if (candidate.has("content")) {
+                    return candidate.path("content").path("parts").get(0).path("text").asText();
+                }
+            }
+        } catch (Exception e) {
+            // Ignore partial or malformed chunks during stream
+        }
+        return "";
     }
 
     @GetMapping("/history")
