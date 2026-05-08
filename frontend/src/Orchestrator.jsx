@@ -552,6 +552,19 @@ export default function GodModeOrchestrator() {
         addLog(`[Fast-Track] Direct routing via ${directCommand.cmd}.`, 'Orchestrator');
       }
 
+      // --- WORKFLOW OVERHAUL: DIRECT SPECIALIZED SYNTHESIS ---
+      // Fast-track logic for Cognitive Formatting & DesignOps items
+      if (outputStyle === 'image_photorealistic' || outputStyle === 'image_blueprint') {
+        selectedAgent = 'DesignOps';
+        fastTracked = true; 
+      } else if (outputStyle === 'game_html5' || outputStyle === 'app_html5') {
+        selectedAgent = 'GameOps';
+        fastTracked = true;
+      } else if (outputStyle === 'audio_synth') {
+        selectedAgent = 'AudioOps';
+        fastTracked = true;
+      }
+
       if (!fastTracked) {
         addLog(`[Intent Check] Routing query...`, 'Orchestrator');
         
@@ -604,7 +617,7 @@ export default function GodModeOrchestrator() {
         addSystemLog('Dispatching prompt to imagen-4.0-generate-001 model...', 'info');
 
         const imagePayload = {
-            instances: { prompt: finalPrompt },
+            instances: [{ prompt: finalPrompt }],
             parameters: { sampleCount: 1 }
         };
         
@@ -678,6 +691,52 @@ export default function GodModeOrchestrator() {
         } else {
            throw new Error("No audio payload returned from TTS model.");
         }
+
+      } else if (selectedAgent === 'GameOps') {
+        addLog(`Orchestrating high-speed interactive synthesis...`, selectedAgent);
+        addSystemLog('POST /v1beta/models/gemini-1.5-flash -> HTML5_ENGINE', 'info');
+        
+        const apiContents = currentHistory.filter(m => m.role !== 'system').map(m => {
+          const parts = [];
+          if (m.text) parts.push({ text: m.text });
+          if (m.attachments) {
+            m.attachments.forEach(att => parts.push({ inlineData: { mimeType: att.mimeType, data: att.base64 } }));
+          }
+          if (parts.length === 0) parts.push({ text: " " });
+          return { role: m.role === 'ai' ? 'model' : 'user', parts };
+        });
+        apiContents.push({ role: 'user', parts: [{ text: finalPrompt }] });
+
+        const gameSysPrompt = AGENT_PERSONAS['GameOps'].prompt + 
+          "\n\n[CRITICAL]: You MUST output ONE COMPLETE HTML FILE containing all CSS and JS. Wrap it in a ```html block.";
+
+        const executionPayload = {
+          contents: apiContents,
+          systemInstruction: { parts: [{ text: gameSysPrompt }] },
+          generationConfig: { temperature: 0.7 }
+        };
+
+        const execRes = await fetch(`/api/v1/orchestrator/chat?model=gemini-1.5-flash`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'X-API-KEY': apiKey.trim() },
+          body: JSON.stringify(executionPayload)
+        });
+
+        if (!execRes.ok) throw new Error(`Game Engine Failed (HTTP ${execRes.status})`);
+        
+        const aiResponseRaw = await execRes.text();
+        let extractedGamePayload = null;
+        let aiResponse = aiResponseRaw;
+
+        if (aiResponseRaw.includes('```html')) {
+          const match = aiResponseRaw.match(/```html\n?([\s\S]*?)```/i);
+          if (match) {
+            extractedGamePayload = match[1];
+            aiResponse = aiResponseRaw.replace(/```html\n?([\s\S]*?)```/i, '\n_[Interactive Application Mounted Below]_\n');
+          }
+        }
+
+        setMessages(prev => [...prev, { role: 'ai', text: aiResponse, agent: 'GameOps', gamePayload: extractedGamePayload }]);
 
       } else {
         const apiContents = currentHistory.filter(m => m.role !== 'system').map(m => {
@@ -788,18 +847,18 @@ export default function GodModeOrchestrator() {
         
         const part = await execRes.text();
         addSystemLog(`[Diagnostic] Gateway Response Received. Length: ${part.length} chars.`, 'info');
-        let aiResponse = part; 
+        let aiResponse = part.trim(); 
 
         // --- TOOL CALL INTERCEPTION ---
         if (aiResponse.startsWith("[TOOL_CALL]:")) {
            try {
               const toolJson = JSON.parse(aiResponse.replace("[TOOL_CALL]:", ""));
               if (toolJson.name === "generate_image") {
-                 const toolPrompt = toolJson.args.prompt;
+                 const toolPrompt = toolJson.args.prompt || toolJson.args.prompt_text;
                  addLog(`AI requested high-fidelity generation: "${toolPrompt}"`, 'DesignOps');
                  
                  // Reuse existing image generation logic
-                 const imagePayload = { instances: { prompt: toolPrompt }, parameters: { sampleCount: 1 } };
+                 const imagePayload = { instances: [{ prompt: toolPrompt }], parameters: { sampleCount: 1 } };
                  const imgRes = await fetch(`/api/v1/orchestrator/chat?model=imagen-4.0-generate-001`, {
                    method: 'POST',
                    headers: { 'Content-Type': 'application/json', 'X-API-KEY': apiKey.trim() },

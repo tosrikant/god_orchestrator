@@ -12,6 +12,9 @@ public class GeminiConfig {
         return WebClient.builder()
                 .baseUrl("https://generativelanguage.googleapis.com/v1beta")
                 .defaultHeader("Content-Type", "application/json")
+                .codecs(configurer -> configurer
+                        .defaultCodecs()
+                        .maxInMemorySize(10 * 1024 * 1024)) // 10MB for images
                 .build();
     }
 }
