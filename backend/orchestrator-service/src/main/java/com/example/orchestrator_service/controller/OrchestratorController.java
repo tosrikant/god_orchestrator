@@ -66,11 +66,13 @@ public class OrchestratorController {
                         double pricePer1M = model.contains("flash") ? 0.075 : 1.25;
                         double cost = ((inputTokens + outputTokens) / 1000000.0) * pricePer1M;
 
-                        com.example.orchestrator_service.model.BillingStats stats = billingStatsRepository.findById("GLOBAL_STATS")
-                            .orElse(new com.example.orchestrator_service.model.BillingStats());
-                        
-                        stats.addUsage(inputTokens, outputTokens, cost);
-                        billingStatsRepository.save(stats);
+                        billingStatsRepository.findById("GLOBAL_STATS")
+                            .defaultIfEmpty(new com.example.orchestrator_service.model.BillingStats())
+                            .flatMap(stats -> {
+                                stats.addUsage(inputTokens, outputTokens, cost);
+                                return billingStatsRepository.save(stats);
+                            })
+                            .subscribe();
 
                     } catch (Exception e) {
                         System.err.println("Persistence Ops Failed: " + e.getMessage());
@@ -79,9 +81,9 @@ public class OrchestratorController {
     }
 
     @GetMapping("/billing")
-    public com.example.orchestrator_service.model.BillingStats getBilling() {
+    public Mono<com.example.orchestrator_service.model.BillingStats> getBilling() {
         return billingStatsRepository.findById("GLOBAL_STATS")
-            .orElse(new com.example.orchestrator_service.model.BillingStats());
+            .defaultIfEmpty(new com.example.orchestrator_service.model.BillingStats());
     }
 
     @GetMapping("/history")
