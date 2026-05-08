@@ -12,18 +12,19 @@ public class InferenceService {
     @Autowired
     private WebClient geminiWebClient;
 
-    public Mono<String> generateContent(String model, String apiKey, GeminiRequest request) {
+    public Mono<String> generateContent(String model, String apiKey, Object request) {
+        String method = model.contains("imagen") ? ":predict" : ":generateContent";
         
         return geminiWebClient.post()
                 .uri(uriBuilder -> uriBuilder
-                        .path("/models/{model}:generateContent")
+                        .path("/models/{model}" + method)
                         .queryParam("key", apiKey)
                         .build(model))
                 .bodyValue(request)
                 .retrieve()
                 .onStatus(status -> status.isError(), response -> 
                     response.bodyToMono(String.class).flatMap(errorBody -> 
-                        Mono.error(new RuntimeException("Gemini API Error: " + errorBody))
+                        Mono.error(new RuntimeException("Inference API Error (" + response.statusCode() + "): " + errorBody))
                     )
                 )
                 .bodyToMono(String.class)

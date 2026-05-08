@@ -9,5 +9,13 @@ spring:
           predicates:
             - Path=/api/v1/orchestrator/**
 
+logging:
+  level:
+    org.springframework.cloud.gateway: TRACE
+    org.springframework.http.server.reactive: DEBUG
+    org.springframework.web.reactive: DEBUG
+    reactor.netty.http.client: DEBUG
+
 server:
   port: 8082
+

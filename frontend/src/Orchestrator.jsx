@@ -178,7 +178,7 @@ export default function GodModeOrchestrator() {
 
   // Load history whenever the active label changes
   useEffect(() => {
-    if (isAuthenticated) {
+    if (isAuthenticated && !isProcessing) {
       const fetchHistory = async () => {
         try {
           const res = await fetch(`/api/v1/orchestrator/history?label=${encodeURIComponent(currentLabel)}`);
@@ -742,7 +742,7 @@ export default function GodModeOrchestrator() {
           if (mcpServers.jira.active) functionDeclarations.push({ name: "get_jira_ticket", description: "Fetch Jira ticket status", parameters: { type: "OBJECT", properties: { ticket_id: { type: "STRING" } }, required: ["ticket_id"] }});
           if (mcpServers.github.active) functionDeclarations.push({ name: "search_repositories", description: "Search GitHub code repos by keyword", parameters: { type: "OBJECT", properties: { query: { type: "STRING" } }, required: ["query"] }});
           
-          if (formattingMode === 'visual') {
+          if (formattingMode === 'visual' || outputStyle.startsWith('image_')) {
             functionDeclarations.push({
               name: "generate_image",
               description: "Generate a high-fidelity image, diagram, or UI mockup based on a prompt.",
@@ -787,6 +787,7 @@ export default function GodModeOrchestrator() {
         }
         
         const part = await execRes.text();
+        addSystemLog(`[Diagnostic] Gateway Response Received. Length: ${part.length} chars.`, 'info');
         let aiResponse = part; 
 
         // --- TOOL CALL INTERCEPTION ---
@@ -830,6 +831,43 @@ export default function GodModeOrchestrator() {
                  return;
               }
            } catch(e) {}
+        }
+
+        // --- FALLBACK: DETECT STRINGIFIED TOOL CALLS (As seen in screenshot) ---
+        if (!aiResponse.startsWith("[TOOL_CALL]:") && (aiResponse.includes('generate_image') || aiResponse.includes('tool_code'))) {
+           try {
+              let promptToUse = null;
+              
+              // Pattern 1: JSON with tool_code (Flexible quotes and spacing)
+              if (aiResponse.includes('"tool_code"')) {
+                 const match = aiResponse.match(/"tool_code":\s*"[^"]*generate_image\(prompt=['"]([^'"]+)['"]/);
+                 if (match) promptToUse = match[1];
+              }
+              
+              // Pattern 2: Naked generate_image call
+              if (!promptToUse) {
+                 const match = aiResponse.match(/generate_image\(prompt=['"]([^'"]+)['"]\)/);
+                 if (match) promptToUse = match[1];
+              }
+
+              if (promptToUse) {
+                 addLog(`Detected stringified generation request: "${promptToUse}"`, 'DesignOps');
+                 const imagePayload = { instances: { prompt: promptToUse }, parameters: { sampleCount: 1 } };
+                 const imgRes = await fetch(`/api/v1/orchestrator/chat?model=imagen-4.0-generate-001`, {
+                   method: 'POST',
+                   headers: { 'Content-Type': 'application/json', 'X-API-KEY': apiKey.trim() },
+                   body: JSON.stringify(imagePayload)
+                 });
+                 const imgData = await imgRes.json();
+                 const base64Image = imgData.predictions?.[0]?.bytesBase64Encoded;
+                 if (base64Image) {
+                    const imageUrl = `data:image/png;base64,${base64Image}`;
+                    setMessages(prev => [...prev, { role: 'ai', text: "Visual synthesis complete.", imageUrl: imageUrl, agent: 'DesignOps' }]);
+                    setIsProcessing(false);
+                    return;
+                 }
+              }
+           } catch(e) { console.error("Fallback tool detection failed", e); }
         }
 
         // Finalize Response
@@ -1246,9 +1284,9 @@ export default function GodModeOrchestrator() {
             onSelectSession={(session) => setCurrentLabel(session.id)}
             isZenMode={isZenMode}
             renderContent={(session, isForeground) => (
-              <div className={`flex-1 flex flex-col relative print:border-none print:bg-white min-w-0 h-full transition-all duration-500 ${!isForeground ? 'pointer-events-none opacity-40' : 'bg-transparent border-r border-cyan-900/30'}`}>
+              <div className={`flex-1 flex flex-col relative min-w-0 min-h-0 transition-all duration-500 ${!isForeground ? 'pointer-events-none opacity-40' : 'bg-black/40'}`}>
             <div className="flex-1 overflow-y-auto custom-scrollbar relative">
-              <div ref={chatContainerRef} className="p-6 space-y-6 min-h-full">
+              <div ref={chatContainerRef} className="p-6 space-y-6 min-h-[400px]">
                 {messages.map((msg, i) => {
                   const persona = AGENT_PERSONAS[msg.agent] || AGENT_PERSONAS['General'];
                   const isMaximized = maximizedIndex === i;
@@ -1407,7 +1445,7 @@ export default function GodModeOrchestrator() {
               </div>
             </div>
             
-            <div className="p-4 bg-slate-900 border-t border-slate-800 shrink-0 print:hidden no-pdf">
+            <div className="p-4 bg-black/80 border-t border-cyan-900/50 shrink-0 print:hidden no-pdf backdrop-blur-md">
               <div className="flex justify-between items-center mb-3 px-1">
                 <span className="text-[10px] text-fuchsia-500 uppercase tracking-wider font-bold flex items-center gap-1">
                   <ImageIcon className="w-3 h-3" /> Cognitive Formatting & DesignOps
@@ -1711,6 +1749,7 @@ export default function GodModeOrchestrator() {
                     }
                   }}
                   className="flex-1 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded text-sm font-bold shadow-lg transition-all"
+                  initial={{ opacity: 0, translateZ: -1000 }}
                 >
                   Initialize
                 </button>

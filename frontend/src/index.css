@@ -45,3 +45,40 @@
 .custom-scrollbar::-webkit-scrollbar-thumb:hover {
   background: rgba(59, 130, 246, 0.5);
 }
+
+/* Temporal Nexus 3D System */
+.nexus-perspective {
+  perspective: 2000px;
+  perspective-origin: center;
+}
+
+.layer-card {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
+
+.glass-lamination {
+  backdrop-filter: blur(20px);
+  mask-image: linear-gradient(to bottom, black 95%, transparent);
+}
+
+.nexus-pulse {
+  animation: nexus-pulse 4s infinite ease-in-out;
+}
+
+@keyframes nexus-pulse {
+  0%, 100% { border-color: rgba(0, 255, 255, 0.1); }
+  50% { border-color: rgba(0, 255, 255, 0.3); }
+}
+
+/* God-Mode Utilities */
+.text-glow-cyan {
+  text-shadow: 0 0 10px rgba(0, 255, 255, 0.5);
+}
+
+.bg-obsidian {
+  background: linear-gradient(180deg, #050505 0%, #000000 100%);
+}
+

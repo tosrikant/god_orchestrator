@@ -28,7 +28,7 @@ public class OrchestratorController {
             @RequestParam String model,
             @RequestParam(required = false, defaultValue = "Default") String label,
             @RequestHeader("X-API-KEY") String apiKey,
-            @RequestBody GeminiRequest request) {
+            @RequestBody com.fasterxml.jackson.databind.JsonNode request) {
         
         return inferenceService.generateContent(model, apiKey, request)
                 .map(rawResponse -> {
@@ -58,13 +58,27 @@ public class OrchestratorController {
                 })
                 .doOnNext(cleanText -> {
                     try {
+                        System.out.println("Processing response persistence for label: " + label);
+                        
+                        String userText = "[No Text]";
+                        if (request.has("contents")) {
+                            var contents = request.get("contents");
+                            if (contents.isArray() && contents.size() > 0) {
+                                var lastContent = contents.get(contents.size() - 1);
+                                if (lastContent.has("parts") && lastContent.get("parts").size() > 0) {
+                                    userText = lastContent.get("parts").get(0).path("text").asText("[Complex/Media Content]");
+                                }
+                            }
+                        } else if (request.has("instances")) {
+                            userText = request.path("instances").path("prompt").asText("[Image Generation]");
+                        }
+
                         // 1. Persist Chat History
                         com.example.orchestrator_service.model.ChatHistory history = new com.example.orchestrator_service.model.ChatHistory();
                         history.setSessionId("default-session");
                         history.setLabel(label);
                         history.setTimestamp(java.time.Instant.now());
                         
-                        String userText = request.getContents().get(request.getContents().size() - 1).getParts().get(0).getText();
                         com.example.orchestrator_service.model.ChatHistory.Message userMsg = new com.example.orchestrator_service.model.ChatHistory.Message();
                         userMsg.setRole("user");
                         userMsg.setText(userText);
@@ -74,10 +88,13 @@ public class OrchestratorController {
                         aiMsg.setText(cleanText); 
                         
                         history.setMessages(java.util.List.of(userMsg, aiMsg));
-                        chatHistoryRepository.save(history).subscribe();
+                        chatHistoryRepository.save(history).subscribe(
+                            null, 
+                            err -> System.err.println("History Save Error: " + err.getMessage())
+                        );
 
                         // 2. Update Billing Stats
-                        long inputTokens = (userText.length() / 4) + 10; // Rough token estimate
+                        long inputTokens = (userText.length() / 4) + 10;
                         long outputTokens = (cleanText.length() / 4) + 10;
                         double pricePer1M = model.contains("flash") ? 0.075 : 1.25;
                         double cost = ((inputTokens + outputTokens) / 1000000.0) * pricePer1M;
@@ -88,10 +105,13 @@ public class OrchestratorController {
                                 stats.addUsage(inputTokens, outputTokens, cost);
                                 return billingStatsRepository.save(stats);
                             })
-                            .subscribe();
-
+                            .subscribe(
+                                null,
+                                err -> System.err.println("Billing Save Error: " + err.getMessage())
+                            );
                     } catch (Exception e) {
                         System.err.println("Persistence Ops Failed: " + e.getMessage());
+                        e.printStackTrace();
                     }
                 });
     }

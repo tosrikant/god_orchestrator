@@ -19,8 +19,8 @@ const TemporalNexus = ({
       // Z-Axis Logic: Aggressive depth for God-Mode
       const z = depth * -800;
       const opacity = isForeground ? 1 : Math.max(0, 0.9 - Math.abs(depth) * 0.4);
-      const blur = isForeground ? 0 : Math.min(32, Math.abs(depth) * 8);
-      const scale = isForeground ? 1 : 1 - (Math.abs(depth) * 0.15);
+      const scale = 1;
+      const blur = isForeground ? 0 : 4;
 
       return {
         id: session.id || index,
@@ -35,29 +35,20 @@ const TemporalNexus = ({
   }, [sessions, activeIndex]);
 
   return (
-    <div className="flex-1 relative overflow-hidden nexus-perspective bg-black">
+    <div className="flex-1 relative overflow-hidden bg-black">
       <AnimatePresence mode="popLayout">
         {layers.map((layer, idx) => (
           <motion.div
             key={layer.id}
-            initial={{ opacity: 0, z: -1000 }}
+            initial={{ opacity: 0 }}
             animate={{ 
-              z: layer.z, 
               opacity: layer.opacity,
-              scale: layer.scale,
-              filter: `blur(${layer.blur}px)`,
+              zIndex: layer.isForeground ? 50 : 0
             }}
-            transition={{ 
-              type: "spring", 
-              stiffness: 260, 
-              damping: 20 
-            }}
-            className={`layer-card glass-lamination ${layer.isForeground ? 'z-50 pointer-events-auto' : 'z-0 pointer-events-none'}`}
-            style={{ 
-              transformStyle: 'preserve-3d',
-            }}
+            transition={{ duration: 0.4 }}
+            className={`absolute inset-0 layer-card glass-lamination ${layer.isForeground ? 'pointer-events-auto' : 'pointer-events-none'}`}
           >
-            <div className={`h-full w-full overflow-hidden flex flex-col relative ${!layer.isForeground ? 'nexus-pulse' : ''}`}
+            <div className={`h-full w-full overflow-hidden flex flex-col relative ${!layer.isForeground ? 'opacity-0' : ''}`}
                  style={{ 
                    background: layer.isForeground ? 'rgba(0,0,0,0.85)' : 'rgba(10,10,10,0.4)',
                    backdropFilter: `blur(${layer.blur}px)`,
@@ -76,13 +67,16 @@ const TemporalNexus = ({
                     <div className="text-[8px] font-bold text-blue-400/60 ml-6 uppercase">Latency: {layer.session.metrics?.latency || '0'}ms</div>
                  </div>
                )}
-               <div className={`flex-1 transition-all duration-700 ${!layer.isForeground ? 'grayscale brightness-50 contrast-125' : ''}`}>
+               <div className={`flex-1 flex flex-col min-h-0 relative transition-all duration-700 ${!layer.isForeground ? 'grayscale brightness-50 contrast-125' : ''}`}>
                   {renderContent(layer.session, layer.isForeground)}
                </div>
             </div>
           </motion.div>
         ))}
       </AnimatePresence>
+      
+      {/* Nexus Floor/Glow */}
+      <div className="absolute bottom-0 left-0 right-0 h-32 bg-gradient-to-t from-cyan-500/10 to-transparent pointer-events-none z-10" />
     </div>
   );
 };
