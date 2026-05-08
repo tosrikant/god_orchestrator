@@ -14,8 +14,8 @@ spec:
     spec:
       containers:
       - name: gateway-service
-        image: gateway-service:vFinal
-        imagePullPolicy: IfNotPresent
+        image: gateway-service:v31
+        imagePullPolicy: Always
         ports:
         - containerPort: 8082
 ---

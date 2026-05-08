@@ -14,8 +14,8 @@ spec:
     spec:
       containers:
       - name: orchestrator-service
-        image: orchestrator-service:vFinal_8
-        imagePullPolicy: IfNotPresent
+        image: orchestrator-service:v31
+        imagePullPolicy: Always
         env:
         - name: SPRING_DATA_MONGODB_URI
           value: mongodb://mongodb:27017/orchestrator

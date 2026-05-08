@@ -1,4 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
+import TemporalNexus from './components/TemporalNexus';
+import NexusScrubber from './components/NexusScrubber';
 import { 
   ShieldCheck, BrainCircuit, Activity, Terminal, Send, Server, Lock, 
   Database, Network, Cpu, ShieldAlert, BarChart4, Cloud, CheckCircle2, 
@@ -140,6 +142,8 @@ export default function GodModeOrchestrator() {
     return localStorage.getItem('gemini_api_key') || '';
   });
   const [coreModel, setCoreModel] = useState('gemini-2.5-flash');
+  const [customModel, setCustomModel] = useState('');
+  const [formattingMode] = useState('auto');
   
   const [chatInput, setChatInput] = useState('');
   const [messages, setMessages] = useState([
@@ -814,6 +818,20 @@ export default function GodModeOrchestrator() {
            }
         }
 
+        // --- DIRECT IMAGE RESPONSE DETECTION (IMAGEN) ---
+        if (aiResponse.includes('"predictions"') && aiResponse.includes('"bytesBase64Encoded"')) {
+           try {
+              const imgData = JSON.parse(aiResponse);
+              const base64Image = imgData.predictions?.[0]?.bytesBase64Encoded;
+              if (base64Image) {
+                 const imageUrl = `data:image/png;base64,${base64Image}`;
+                 setMessages(prev => [...prev, { role: 'ai', text: "High-fidelity synthesis successful.", imageUrl: imageUrl, agent: 'DesignOps' }]);
+                 setIsProcessing(false);
+                 return;
+              }
+           } catch(e) {}
+        }
+
         // Finalize Response
         if (!aiResponse) aiResponse = "Empty response.";
         
@@ -1156,7 +1174,7 @@ export default function GodModeOrchestrator() {
           
           {/* Left Pane: Session Vault */}
           {!isZenMode && (
-            <div className="w-72 bg-slate-900/50 border-r border-slate-800 flex flex-col print:hidden no-pdf shrink-0">
+            <div className="w-72 bg-black/90 border-r border-cyan-900/50 flex flex-col print:hidden no-pdf shrink-0 relative z-20 shadow-[0_0_20px_rgba(0,255,255,0.1)]">
               <div className="p-4 border-b border-slate-800 shrink-0">
                 <div className="flex items-center justify-between mb-4">
                   <h2 className="text-xs font-bold text-slate-400 uppercase tracking-wider flex items-center gap-2"><FolderSearch className="w-4 h-4" /> Chat Vault</h2>
@@ -1217,7 +1235,18 @@ export default function GodModeOrchestrator() {
           )}
 
           {/* Center Pane: Chat Core */}
-          <div className="flex-1 flex flex-col bg-slate-950 border-r border-slate-800 relative print:border-none print:bg-white">
+          <TemporalNexus 
+            sessions={labels.map(l => ({ 
+              id: l, 
+              label: l, 
+              isActive: activeAgent !== 'General' && currentLabel === l,
+              metrics: metrics
+            }))}
+            activeIndex={labels.indexOf(currentLabel)}
+            onSelectSession={(session) => setCurrentLabel(session.id)}
+            isZenMode={isZenMode}
+            renderContent={(session, isForeground) => (
+              <div className={`flex-1 flex flex-col relative print:border-none print:bg-white min-w-0 h-full transition-all duration-500 ${!isForeground ? 'pointer-events-none opacity-40' : 'bg-transparent border-r border-cyan-900/30'}`}>
             <div className="flex-1 overflow-y-auto custom-scrollbar relative">
               <div ref={chatContainerRef} className="p-6 space-y-6 min-h-full">
                 {messages.map((msg, i) => {
@@ -1460,10 +1489,22 @@ export default function GodModeOrchestrator() {
               </div>
             </div>
           </div>
+          )}
+        />
+
+        {/* THE SCRUBBER (Right Axis) */}
+        {!isZenMode && (
+          <NexusScrubber 
+            total={labels.length}
+            active={labels.indexOf(currentLabel)}
+            onChange={(idx) => setCurrentLabel(labels[idx])}
+            sessions={labels.map(l => ({ label: l }))}
+          />
+        )}
 
           {/* Right Pane: Telemetry Hub */}
           {!isZenMode && (
-            <div className="w-80 bg-slate-900/50 flex flex-col print:hidden no-pdf shrink-0 overflow-hidden">
+            <div className="w-80 bg-black/60 border-l border-cyan-900/50 flex flex-col print:hidden no-pdf shrink-0 overflow-hidden backdrop-blur-xl relative z-20">
               <div className="p-4 border-b border-slate-800 shrink-0">
                 <h2 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-4 flex items-center gap-2"><Activity className="w-4 h-4 text-blue-500" /> Live Telemetry</h2>
                 

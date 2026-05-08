@@ -35,7 +35,23 @@ public class OrchestratorController {
                     try {
                         ObjectMapper mapper = new ObjectMapper();
                         JsonNode root = mapper.readTree(rawResponse);
-                        return root.path("candidates").get(0).path("content").path("parts").get(0).path("text").asText();
+                        
+                        // Case 1: Gemini Chat Response (Candidates)
+                        if (root.has("candidates")) {
+                            JsonNode part = root.path("candidates").get(0).path("content").path("parts").get(0);
+                            if (part.has("text")) {
+                                return part.path("text").asText();
+                            } else if (part.has("functionCall")) {
+                                return "[TOOL_CALL]:" + mapper.writeValueAsString(part.path("functionCall"));
+                            }
+                        }
+                        
+                        // Case 2: Imagen Response (Predictions)
+                        if (root.has("predictions")) {
+                            return rawResponse; // Return raw JSON so frontend can handle image logic
+                        }
+
+                        return rawResponse;
                     } catch (Exception e) {
                         return rawResponse;
                     }
