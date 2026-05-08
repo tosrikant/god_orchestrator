@@ -144,8 +144,44 @@ export default function GodModeOrchestrator() {
   const [coreModel, setCoreModel] = useState('gemini-2.5-flash');
   const [customModel, setCustomModel] = useState('');
   const [formattingMode] = useState('auto');
-  
   const [chatInput, setChatInput] = useState('');
+
+  // Utility: Extract artifacts (HTML5, JSX, etc.) from raw text
+  const extractArtifacts = (rawText, agent = 'General') => {
+    let text = rawText;
+    let gamePayload = null;
+    
+    if (!text) return { text: '', gamePayload: null };
+
+    const htmlKeywords = ['<!DOCTYPE html>', '<html', '<head', '<body', 'import React', 'ReactDOM.render', 'ReactDOM.createRoot'];
+    const isPotentialApp = agent === 'GameOps' || htmlKeywords.some(kw => text.toLowerCase().includes(kw.toLowerCase()));
+
+    if (isPotentialApp) {
+      const patterns = [
+        /```html\n?([\s\S]*?)```/i,
+        /```jsx\n?([\s\S]*?)```/i,
+        /```javascript\n?([\s\S]*?)```/i,
+        /(<!DOCTYPE html>[\s\S]*?<\/html>)/is,
+        /(<html[\s\S]*?<\/html>)/is
+      ];
+
+      for (const pattern of patterns) {
+        const match = text.match(pattern);
+        if (match) {
+          gamePayload = (match[1] || match[0]).trim();
+          text = text.replace(pattern, '\n_[Interactive Application Mounted Below]_\n');
+          break;
+        }
+      }
+      
+      if (!gamePayload && agent === 'GameOps' && text.length > 200) {
+        gamePayload = text;
+        text = '_[Raw Content Wrapped as Application]_';
+      }
+    }
+    return { text, gamePayload };
+  };
+
   const [messages, setMessages] = useState([
     { role: 'system', text: 'GOD-MODE ORCHESTRATOR ONLINE. Persistence & Memory pipelines active.' }
   ]);
@@ -188,14 +224,20 @@ export default function GodModeOrchestrator() {
           if (res.ok) {
             const history = await res.json();
             if (history && history.length > 0) {
-              const flattened = history.flatMap(h => (h.messages || []).map(m => ({
-                role: m.role === 'model' ? 'ai' : m.role,
-                text: m.text,
-                agent: m.agent || (m.role === 'model' ? 'Orchestrator' : 'User'),
-                imageUrl: m.imageUrl,
-                audioUrl: m.audioUrl,
-                gamePayload: m.gamePayload
-              })));
+              const flattened = history.flatMap(h => (h.messages || []).map(m => {
+                const agent = m.agent || (m.role === 'model' ? 'Orchestrator' : 'User');
+                // Hydrate artifacts from history
+                const { text: cleanText, gamePayload: hydratedPayload } = extractArtifacts(m.text, agent);
+                
+                return {
+                  role: m.role === 'model' ? 'ai' : m.role,
+                  text: cleanText,
+                  agent: agent,
+                  imageUrl: m.imageUrl,
+                  audioUrl: m.audioUrl,
+                  gamePayload: m.gamePayload || hydratedPayload
+                };
+              }));
 
               // Advanced De-duplication: Remove identical consecutive turns (User + AI pairs)
               const cleanHistory = [];
@@ -1071,41 +1113,8 @@ export default function GodModeOrchestrator() {
         }
 
         // Finalize Response
-        if (!aiResponse) aiResponse = "Empty response.";
-        
-        let extractedGamePayload = null;
-        const htmlKeywords = ['<!DOCTYPE html>', '<html', '<head', '<body', 'import React', 'ReactDOM.render', 'ReactDOM.createRoot'];
-        const isPotentialApp = selectedAgent === 'GameOps' || htmlKeywords.some(kw => aiResponse.toLowerCase().includes(kw.toLowerCase()));
-
-        if (isPotentialApp) {
-          // Robust Extraction Strategy: Try multiple regex patterns
-          const patterns = [
-            /```html\n?([\s\S]*?)```/i,
-            /```jsx\n?([\s\S]*?)```/i,
-            /```javascript\n?([\s\S]*?)```/i,
-            /(<!DOCTYPE html>[\s\S]*?<\/html>)/is,
-            /(<html[\s\S]*?<\/html>)/is
-          ];
-
-          for (const pattern of patterns) {
-            const match = aiResponse.match(pattern);
-            if (match && match[1]) {
-              extractedGamePayload = match[1].trim();
-              aiResponse = aiResponse.replace(pattern, '\n_[Interactive Application Mounted Below]_\n');
-              break;
-            } else if (match && match[0]) {
-              extractedGamePayload = match[0].trim();
-              aiResponse = aiResponse.replace(pattern, '\n_[Interactive Application Mounted Below]_\n');
-              break;
-            }
-          }
-          
-          // Fallback: If no tags found but agent is GameOps, try to wrap raw content
-          if (!extractedGamePayload && selectedAgent === 'GameOps' && aiResponse.length > 200) {
-             extractedGamePayload = aiResponse;
-             aiResponse = '_[Raw Content Wrapped as Application]_';
-          }
-        }
+        const { text: cleanAiResponse, gamePayload: extractedGamePayload } = extractArtifacts(aiResponse, selectedAgent);
+        aiResponse = cleanAiResponse;
 
         addLog(`Synthesis complete.`, selectedAgent);
         setMessages(prev => {
