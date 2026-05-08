@@ -34,29 +34,74 @@ public class OrchestratorController {
             @RequestBody Map<String, Object> request) {
         
         return inferenceService.generateContent(model, apiKey, request)
-                .map(rawResponse -> {
+                .flatMap(rawResponse -> {
+                    // Log to history repository
+                    com.example.orchestrator_service.model.ChatHistory history = new com.example.orchestrator_service.model.ChatHistory();
+                    history.setLabel(label);
+                    history.setTimestamp(java.time.Instant.now());
+                    
+                    // Extract messages from request and response for persistence
                     try {
                         ObjectMapper mapper = new ObjectMapper();
                         JsonNode root = mapper.readTree(rawResponse);
                         
-                        // Case 1: Gemini Chat Response (Candidates)
+                        com.example.orchestrator_service.model.ChatHistory.Message aiMsg = new com.example.orchestrator_service.model.ChatHistory.Message();
+                        aiMsg.setRole("model");
+                        
                         if (root.has("candidates")) {
                             JsonNode part = root.path("candidates").get(0).path("content").path("parts").get(0);
-                            if (part.has("text")) {
-                                return part.path("text").asText();
-                            } else if (part.has("functionCall")) {
-                                return "[TOOL_CALL]:" + mapper.writeValueAsString(part.path("functionCall"));
+                            aiMsg.setText(part.path("text").asText());
+                        } else if (root.has("predictions")) {
+                            // IMAGEN Case
+                            String base64 = root.path("predictions").get(0).path("bytesBase64Encoded").asText();
+                            if (!base64.isEmpty()) {
+                                aiMsg.setImageUrl("data:image/png;base64," + base64);
+                                aiMsg.setText("Visual synthesis complete.");
                             }
-                        }
-                        
-                        // Case 2: Imagen Response (Predictions)
-                        if (root.has("predictions")) {
-                            return rawResponse; 
+                        } else {
+                            aiMsg.setText(rawResponse);
                         }
 
-                        return rawResponse;
+                        // Create historical record for user
+                        com.example.orchestrator_service.model.ChatHistory.Message userMsg = new com.example.orchestrator_service.model.ChatHistory.Message();
+                        userMsg.setRole("user");
+                        
+                        // Extract user message text from request body (last message in 'contents')
+                        Object contentsObj = request.get("contents");
+                        if (contentsObj instanceof java.util.List) {
+                            java.util.List<?> contents = (java.util.List<?>) contentsObj;
+                            if (!contents.isEmpty()) {
+                                // Find the last message with role 'user'
+                                for (int i = contents.size() - 1; i >= 0; i--) {
+                                    Object content = contents.get(i);
+                                    if (content instanceof Map) {
+                                        Map<?, ?> contentMap = (Map<?, ?>) content;
+                                        if ("user".equals(contentMap.get("role"))) {
+                                            Object partsObj = contentMap.get("parts");
+                                            if (partsObj instanceof java.util.List && !((java.util.List<?>) partsObj).isEmpty()) {
+                                                Object firstPart = ((java.util.List<?>) partsObj).get(0);
+                                                if (firstPart instanceof Map) {
+                                                    userMsg.setText((String) ((Map<?, ?>) firstPart).get("text"));
+                                                }
+                                            }
+                                            break;
+                                        }
+                                    }
+                                }
+                            }
+                        }
+
+                        history.setMessages(java.util.List.of(userMsg, aiMsg));
+                        
+                        // Extract the sanitized text to return to the frontend
+                        String responseToReturn = aiMsg.getText();
+                        
+                        // Save asynchronously and return the sanitized response
+                        return chatHistoryRepository.save(history)
+                                .thenReturn(responseToReturn);
+                                
                     } catch (Exception e) {
-                        return rawResponse;
+                        return Mono.just(rawResponse);
                     }
                 });
     }

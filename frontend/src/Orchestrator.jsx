@@ -178,8 +178,11 @@ export default function GodModeOrchestrator() {
 
   // Load history whenever the active label changes
   useEffect(() => {
-    if (isAuthenticated && !isProcessing) {
+    if (isAuthenticated) {
       const fetchHistory = async () => {
+        // Clear current messages to prevent ghosting during switch
+        setMessages([{ role: 'system', text: `SYNCING THREAD: ${currentLabel}...` }]);
+        
         try {
           const res = await fetch(`/api/v1/orchestrator/history?label=${encodeURIComponent(currentLabel)}`);
           if (res.ok) {
@@ -188,7 +191,10 @@ export default function GodModeOrchestrator() {
               const flattened = history.flatMap(h => (h.messages || []).map(m => ({
                 role: m.role === 'model' ? 'ai' : m.role,
                 text: m.text,
-                agent: m.role === 'model' ? 'Orchestrator' : 'User'
+                agent: m.agent || (m.role === 'model' ? 'Orchestrator' : 'User'),
+                imageUrl: m.imageUrl,
+                audioUrl: m.audioUrl,
+                gamePayload: m.gamePayload
               })));
               setMessages(flattened);
             } else {
@@ -197,6 +203,7 @@ export default function GodModeOrchestrator() {
           }
         } catch (err) {
           console.error('History Sync Failed:', err);
+          setMessages([{ role: 'system', text: 'CONNECTION_FAULT: Persistence layer unreachable.' }]);
         }
       };
       fetchHistory();
@@ -269,13 +276,15 @@ export default function GodModeOrchestrator() {
   const [isZenMode, setIsZenMode] = useState(false);
   const [leftWidth, setLeftWidth] = useState(320);
   const [rightWidth, setRightWidth] = useState(320);
-  const [telemetryHeight, setTelemetryHeight] = useState(400); // Height of the top telemetry part
-  const [payloadHeight, setPayloadHeight] = useState(300); // Height of the payload part
-  
+  const [telemetryHeight, setTelemetryHeight] = useState(400); 
+  const [payloadHeight, setPayloadHeight] = useState(300); 
+  const [inputHeight, setInputHeight] = useState(50); // Height of the chat input area
+
   const isResizingLeft = useRef(false);
   const isResizingRight = useRef(false);
   const isResizingTeleV = useRef(false);
   const isResizingPayloadV = useRef(false);
+  const isResizingInputV = useRef(false);
 
   const handleMouseMove = (e) => {
     if (isResizingLeft.current) {
@@ -285,10 +294,13 @@ export default function GodModeOrchestrator() {
       setRightWidth(Math.max(200, Math.min(800, window.innerWidth - e.clientX)));
     }
     if (isResizingTeleV.current) {
-      setTelemetryHeight(Math.max(100, Math.min(800, e.clientY - 60))); // Adj for header
+      setTelemetryHeight(Math.max(100, Math.min(800, e.clientY - 60))); 
     }
     if (isResizingPayloadV.current) {
       setPayloadHeight(Math.max(100, Math.min(800, e.clientY - 400))); 
+    }
+    if (isResizingInputV.current) {
+      setInputHeight(Math.max(50, Math.min(500, window.innerHeight - e.clientY - 20)));
     }
   };
 
@@ -297,9 +309,17 @@ export default function GodModeOrchestrator() {
     isResizingRight.current = false;
     isResizingTeleV.current = false;
     isResizingPayloadV.current = false;
+    isResizingInputV.current = false;
     document.removeEventListener('mousemove', handleMouseMove);
     document.removeEventListener('mouseup', stopResizing);
     document.body.style.cursor = 'default';
+  };
+
+  const startResizingInputV = () => {
+    isResizingInputV.current = true;
+    document.addEventListener('mousemove', handleMouseMove);
+    document.addEventListener('mouseup', stopResizing);
+    document.body.style.cursor = 'row-resize';
   };
 
   const startResizingLeft = () => {
@@ -365,7 +385,7 @@ export default function GodModeOrchestrator() {
     DesignOps: { name: 'DesignOps Viz-Agent', icon: <ImageIcon className="w-5 h-5" />, color: 'text-fuchsia-500', bgColor: 'bg-fuchsia-500/10', borderColor: 'border-fuchsia-500/50', prompt: "You are the DesignOps Sub-Agent. You generate visual blueprints." },
     GameOps: { name: 'App & Game Engine', icon: <Gamepad2 className="w-5 h-5" />, color: 'text-orange-500', bgColor: 'bg-orange-500/10', borderColor: 'border-orange-500/50', prompt: "You synthesize playable HTML5 interactions and utility apps." },
     AudioOps: { name: 'AudioOps Synth-Agent', icon: <Headphones className="w-5 h-5" />, color: 'text-indigo-500', bgColor: 'bg-indigo-500/10', borderColor: 'border-indigo-500/50', prompt: "You orchestrate actual text-to-speech audio synthesis." },
-    General: { name: 'Master Orchestrator', icon: <BrainCircuit className="w-5 h-5" />, color: 'text-blue-500', bgColor: 'bg-blue-500/10', borderColor: 'border-blue-500/50', prompt: "You are the Master Orchestrator. You handle general architecture, coding, executive reports, and business logic." }
+    General: { name: 'Master Orchestrator', icon: <BrainCircuit className="w-5 h-5" />, color: 'text-blue-500', bgColor: 'bg-blue-500/10', borderColor: 'border-blue-500/50', prompt: "You are the Master Orchestrator. You handle general architecture, coding, executive reports, and business logic. You are talking to John." }
   };
 
   const MODEL_PRICING = {
@@ -708,7 +728,7 @@ export default function GodModeOrchestrator() {
         setLastApiPayload(imagePayload);
         setEditablePayload(JSON.stringify(imagePayload, null, 2));
 
-        const execRes = await fetch(`/api/v1/orchestrator/chat?model=imagen-4.0-generate-001`, {
+        const execRes = await fetch(`/api/v1/orchestrator/chat?model=imagen-4.0-generate-001&label=${encodeURIComponent(currentLabel)}`, {
           method: 'POST',
           headers: { 
             'Content-Type': 'application/json',
@@ -751,7 +771,7 @@ export default function GodModeOrchestrator() {
         setLastApiPayload(audioPayload);
         setEditablePayload(JSON.stringify(audioPayload, null, 2));
         
-        const execRes = await fetch(`/api/v1/orchestrator/chat?model=gemini-2.5-flash-preview-tts`, {
+        const execRes = await fetch(`/api/v1/orchestrator/chat?model=gemini-2.5-flash-preview-tts&label=${encodeURIComponent(currentLabel)}`, {
           method: 'POST',
           headers: { 
             'Content-Type': 'application/json',
@@ -800,7 +820,7 @@ export default function GodModeOrchestrator() {
           generationConfig: { temperature: 0.7 }
         };
 
-        const execRes = await fetch(`/api/v1/orchestrator/chat?model=gemini-1.5-flash`, {
+        const execRes = await fetch(`/api/v1/orchestrator/chat?model=gemini-1.5-flash&label=${encodeURIComponent(currentLabel)}`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json', 'X-API-KEY': apiKey.trim() },
           body: JSON.stringify(executionPayload)
@@ -943,7 +963,7 @@ export default function GodModeOrchestrator() {
                  
                  // Reuse existing image generation logic
                  const imagePayload = { instances: [{ prompt: toolPrompt }], parameters: { sampleCount: 1 } };
-                 const imgRes = await fetch(`/api/v1/orchestrator/chat?model=imagen-4.0-generate-001`, {
+                 const imgRes = await fetch(`/api/v1/orchestrator/chat?model=imagen-4.0-generate-001&label=${encodeURIComponent(currentLabel)}`, {
                    method: 'POST',
                    headers: { 'Content-Type': 'application/json', 'X-API-KEY': apiKey.trim() },
                    body: JSON.stringify(imagePayload)
@@ -996,7 +1016,7 @@ export default function GodModeOrchestrator() {
               if (promptToUse) {
                  addLog(`Detected stringified generation request: "${promptToUse}"`, 'DesignOps');
                  const imagePayload = { instances: { prompt: promptToUse }, parameters: { sampleCount: 1 } };
-                 const imgRes = await fetch(`/api/v1/orchestrator/chat?model=imagen-4.0-generate-001`, {
+                 const imgRes = await fetch(`/api/v1/orchestrator/chat?model=imagen-4.0-generate-001&label=${encodeURIComponent(currentLabel)}`, {
                    method: 'POST',
                    headers: { 'Content-Type': 'application/json', 'X-API-KEY': apiKey.trim() },
                    body: JSON.stringify(imagePayload)
@@ -1144,7 +1164,7 @@ export default function GodModeOrchestrator() {
       addLog(`[Raw API Override] Intercepting payload and dispatching to network...`, 'Orchestrator');
       addSystemLog('Dispatching modified raw JSON payload...', 'info');
 
-      const execRes = await fetch(`/api/v1/orchestrator/chat?model=${activeModelEndpoint}`, {
+      const execRes = await fetch(`/api/v1/orchestrator/chat?model=${activeModelEndpoint}&label=${encodeURIComponent(currentLabel)}`, {
         method: 'POST',
         headers: { 
           'Content-Type': 'application/json',
@@ -1666,22 +1686,30 @@ export default function GodModeOrchestrator() {
                   </div>
                 )}
                 
-                <form onSubmit={handleSendMessage} className="relative flex items-center">
+                <div onMouseDown={startResizingInputV} className="h-1.5 w-full cursor-row-resize hover:bg-blue-500/30 transition-colors absolute top-0 left-0 right-0 z-50" />
+                
+                <form onSubmit={handleSendMessage} className="relative flex items-end pt-2">
                   <input type="file" ref={fileInputRef} className="hidden" multiple accept="image/*,application/pdf" onChange={(e) => Array.from(e.target.files).forEach(processAttachment)} />
-                  <button type="button" onClick={() => fileInputRef.current?.click()} className="absolute left-2 p-1.5 text-slate-400 hover:text-slate-200 hover:bg-slate-800 rounded transition-colors z-10" title="Attach image/PDF">
+                  <button type="button" onClick={() => fileInputRef.current?.click()} className="absolute left-2 bottom-3 p-1.5 text-slate-400 hover:text-slate-200 hover:bg-slate-800 rounded transition-colors z-10" title="Attach image/PDF">
                     <Paperclip className="w-4 h-4" />
                   </button>
-                  <input 
+                  <textarea 
                     ref={inputRef} 
-                    type="text" 
                     value={chatInput} 
                     onChange={handleChatInputChange} 
                     onPaste={handlePaste}
-                    placeholder="Ask the Swarm or type / for Workspace tools... (Paste images directly)" 
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' && !e.shiftKey) {
+                        e.preventDefault();
+                        handleSendMessage(e);
+                      }
+                    }}
+                    placeholder="Ask the Swarm or type / for Workspace tools... (Shift+Enter for new line)" 
                     disabled={isProcessing} 
-                    className="w-full bg-slate-950 border border-slate-700 rounded-md py-3 pl-10 pr-12 text-sm focus:outline-none focus:border-blue-500 focus:ring-1" 
+                    className="w-full bg-slate-950 border border-slate-700 rounded-md py-3 pl-10 pr-12 text-sm focus:outline-none focus:border-blue-500 focus:ring-1 resize-none custom-scrollbar min-h-[50px]" 
+                    style={{ height: `${inputHeight}px` }}
                   />
-                  <button type="submit" disabled={isProcessing || (!chatInput.trim() && chatAttachments.length === 0)} className="absolute right-2 p-1.5 bg-blue-600 hover:bg-blue-500 text-white rounded transition-colors disabled:opacity-50 z-10">
+                  <button type="submit" disabled={isProcessing || (!chatInput.trim() && chatAttachments.length === 0)} className="absolute right-2 bottom-3 p-1.5 bg-blue-600 hover:bg-blue-500 text-white rounded transition-colors disabled:opacity-50 z-10">
                     <Send className="w-4 h-4" />
                   </button>
                 </form>

@@ -20,5 +20,9 @@ public class ChatHistory {
     public static class Message {
         private String role;
         private String text;
+        private String imageUrl;
+        private String audioUrl;
+        private String gamePayload;
+        private String agent;
     }
 }
